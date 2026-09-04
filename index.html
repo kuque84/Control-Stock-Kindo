@@ -557,15 +557,23 @@
           val.length === 0;
       }
 
-      // Normalización de código
+      // Normalización y parche de corrección óptica
       function sanitizeToken(t) {
         let clean = String(t || "")
           .replace(/[\*\s\-]/g, "")
           .toUpperCase()
           .trim();
+
+        // Si la cámara leyó '579...' en lugar del código argentino '779...' (13 dígitos)
+        if (clean.length === 13 && clean.startsWith("579")) {
+          clean = "7" + clean.substring(1);
+        }
+
+        // Por si llega a leer 14 dígitos con un 5 colado adelante (5779...)
         if (clean.length === 14 && clean.startsWith("5779")) {
           clean = clean.substring(1);
         }
+
         return clean;
       }
 
