@@ -2,486 +2,857 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>KINDO - Dark Store Hub General Paz</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>KINDO Ops // Dark Store Hub</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
       rel="stylesheet"
     />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Lector de Código de Barras y QR por Cámara -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
     <style>
       :root {
-        --primary: #0f172a;
-        --accent: #6366f1;
-        --success: #16a34a;
+        --bg: #090d16;
+        --surface: #131b2e;
+        --surface-border: #232f48;
+        --primary: #6366f1;
+        --primary-hover: #4f46e5;
+        --accent: #38bdf8;
+        --success: #10b981;
         --warning: #f59e0b;
-        --danger: #ef4444;
-        --bg: #f8fafc;
-        --card: #ffffff;
-        --border: #e2e8f0;
-        --text: #1e293b;
-        --text-muted: #64748b;
+        --danger: #f43f5e;
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
       }
+
       * {
         box-sizing: border-box;
         margin: 0;
         padding: 0;
-        font-family: "Roboto", sans-serif;
+        font-family: "Plus Jakarta Sans", sans-serif;
+        -webkit-tap-highlight-color: transparent;
       }
       body {
         background: var(--bg);
         color: var(--text);
-        padding-bottom: 70px;
+        min-height: 100vh;
+        padding-bottom: 90px;
       }
 
-      /* Navbar */
-      .navbar {
-        background: var(--primary);
-        color: white;
-        padding: 12px 16px;
+      /* Login Modal */
+      #login-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(9, 13, 22, 0.95);
+        backdrop-filter: blur(10px);
         display: flex;
-        justify-content: space-between;
         align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 20px;
+      }
+      .auth-box {
+        background: var(--surface);
+        border: 1px solid var(--surface-border);
+        border-radius: 20px;
+        width: 100%;
+        max-width: 360px;
+        padding: 28px;
+        text-align: center;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      }
+      .auth-badge {
+        display: inline-block;
+        background: rgba(99, 102, 241, 0.15);
+        color: var(--primary);
+        padding: 4px 12px;
+        border-radius: 99px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+      .auth-input {
+        width: 100%;
+        background: #090d16;
+        border: 2px solid var(--surface-border);
+        border-radius: 12px;
+        padding: 14px;
+        color: white;
+        font-size: 1.5rem;
+        text-align: center;
+        font-family: "JetBrains Mono", monospace;
+        letter-spacing: 6px;
+        margin: 16px 0;
+        outline: none;
+      }
+      .auth-input:focus {
+        border-color: var(--primary);
+      }
+
+      /* App Header */
+      .topbar {
+        background: rgba(19, 27, 46, 0.85);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--surface-border);
+        padding: 14px 18px;
         position: sticky;
         top: 0;
         z-index: 100;
-      }
-      .brand {
-        font-family: "JetBrains Mono", monospace;
-        font-size: 1.1rem;
-        letter-spacing: 1px;
-      }
-      .badge-status {
-        background: #334155;
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 0.75rem;
-      }
-
-      /* Tab Bar */
-      .tab-bar {
         display: flex;
-        background: white;
-        border-bottom: 1px solid var(--border);
+        justify-content: space-between;
+        align-items: center;
       }
-      .tab-btn {
-        flex: 1;
-        padding: 14px 8px;
-        border: none;
-        background: none;
-        font-weight: 700;
-        font-size: 0.85rem;
-        color: var(--text-muted);
-        cursor: pointer;
-        border-bottom: 3px solid transparent;
+      .brand-title {
+        font-size: 1rem;
+        font-weight: 800;
+        letter-spacing: 0.5px;
       }
-      .tab-btn.active {
+      .brand-title span {
         color: var(--accent);
-        border-bottom-color: var(--accent);
+      }
+      .user-pill {
+        font-size: 0.75rem;
+        background: var(--surface-border);
+        padding: 4px 10px;
+        border-radius: 99px;
+        color: var(--text-muted);
+        font-weight: 600;
       }
 
       .container {
-        max-width: 720px;
-        margin: 16px auto;
-        padding: 0 12px;
-      }
-      .card {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 12px;
+        max-width: 600px;
+        margin: 0 auto;
         padding: 16px;
-        margin-bottom: 16px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
       }
 
-      /* KPIs Grid */
-      .kpi-grid {
+      /* Card System */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--surface-border);
+        border-radius: 16px;
+        padding: 18px;
+        margin-bottom: 16px;
+      }
+
+      /* KPI Summary Row */
+      .kpi-row {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 10px;
         margin-bottom: 16px;
       }
-      .kpi-card {
-        background: white;
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 12px;
+      .kpi-block {
+        background: var(--surface);
+        border: 1px solid var(--surface-border);
+        border-radius: 14px;
+        padding: 12px 6px;
         text-align: center;
       }
-      .kpi-card .num {
-        font-size: 1.3rem;
-        font-weight: 700;
-        color: var(--primary);
+      .kpi-val {
         font-family: "JetBrains Mono", monospace;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text);
       }
-      .kpi-card .lbl {
-        font-size: 0.7rem;
+      .kpi-lbl {
+        font-size: 0.65rem;
+        font-weight: 700;
         color: var(--text-muted);
         text-transform: uppercase;
-        font-weight: 700;
         margin-top: 4px;
       }
 
-      /* Inputs */
-      .input-box {
+      /* Form Elements */
+      .field-label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+      }
+      .input-control {
         width: 100%;
-        padding: 14px;
-        border: 2px solid var(--border);
-        border-radius: 8px;
-        font-size: 1rem;
+        background: #090d16;
+        border: 1px solid var(--surface-border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        color: white;
+        font-size: 0.95rem;
         margin-bottom: 12px;
         outline: none;
-        transition: border-color 0.2s;
       }
-      .input-box:focus {
+      .input-control:focus {
         border-color: var(--accent);
       }
 
       .btn {
         width: 100%;
         padding: 14px;
-        border-radius: 8px;
         border: none;
+        border-radius: 12px;
         font-weight: 700;
-        font-size: 1rem;
+        font-size: 0.95rem;
         cursor: pointer;
-        color: white;
-        background: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: 0.2s;
       }
-      .btn:hover {
-        opacity: 0.95;
-      }
-      .btn-dispatch {
+      .btn-primary {
         background: var(--primary);
+        color: white;
+      }
+      .btn-primary:active {
+        transform: scale(0.98);
+        background: var(--primary-hover);
+      }
+      .btn-camera {
+        background: #1e293b;
+        color: var(--accent);
+        border: 1px solid var(--surface-border);
+        margin-bottom: 12px;
       }
 
-      /* Lista de Items */
-      .item-card {
+      /* Camera Container */
+      #reader-container {
+        display: none;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 14px;
+        border: 2px solid var(--accent);
+      }
+
+      /* List Items */
+      .stock-card {
+        background: var(--surface);
+        border: 1px solid var(--surface-border);
+        border-radius: 12px;
+        padding: 14px;
+        margin-bottom: 8px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        margin-bottom: 8px;
-        background: white;
       }
-      .item-card.reorden {
-        border-left: 5px solid var(--warning);
+      .stock-card.reorden {
+        border-left: 4px solid var(--warning);
       }
-      .item-card.quiebre {
-        border-left: 5px solid var(--danger);
+      .stock-card.quiebre {
+        border-left: 4px solid var(--danger);
       }
-      .item-title {
+      .badge {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
         font-weight: 700;
-        font-size: 0.9rem;
-        color: var(--primary);
-      }
-      .item-sub {
-        font-size: 0.78rem;
-        color: var(--text-muted);
-        margin-top: 2px;
-      }
-      .badge-stock {
         padding: 4px 8px;
         border-radius: 6px;
-        font-weight: 700;
-        font-size: 0.8rem;
-        font-family: "JetBrains Mono", monospace;
       }
       .badge-ok {
-        background: #dcfce7;
-        color: #15803d;
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--success);
       }
       .badge-reorden {
-        background: #fef3c7;
-        color: #b45309;
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--warning);
       }
       .badge-quiebre {
-        background: #fee2e2;
-        color: #b91c1c;
+        background: rgba(244, 63, 94, 0.15);
+        color: var(--danger);
+      }
+
+      /* Bottom Navigation Bar */
+      .nav-tabs {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(19, 27, 46, 0.95);
+        backdrop-filter: blur(12px);
+        border-top: 1px solid var(--surface-border);
+        display: flex;
+        height: 64px;
+        z-index: 100;
+      }
+      .tab-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        font-size: 0.7rem;
+        font-weight: 700;
+        background: none;
+        border: none;
+        cursor: pointer;
+        gap: 4px;
+      }
+      .tab-item.active {
+        color: var(--accent);
       }
     </style>
   </head>
   <body>
-    <nav class="navbar">
-      <div class="brand">KINDO // DARK STORE</div>
-      <div class="badge-status" id="syncStatus">🟢 Conectado</div>
-    </nav>
+    <!-- MODAL DE LOGIN SEGURO (8 HORAS) -->
+    <div id="login-modal">
+      <div class="auth-box">
+        <div class="auth-badge">KINDO DARK STORE</div>
+        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 4px">
+          Acceso Operativo
+        </h2>
+        <p style="font-size: 0.8rem; color: var(--text-muted)">
+          Ingresá tu PIN numérico de operador
+        </p>
 
-    <div class="tab-bar">
-      <button class="tab-btn active" onclick="switchTab('dispatch', this)">
-        📦 Pick & Pack
-      </button>
-      <button class="tab-btn" onclick="switchTab('stock', this)">
-        📋 Stock & Alertas
-      </button>
-      <button class="tab-btn" onclick="switchTab('kpis', this)">
-        📊 Tablero KPIs
-      </button>
+        <input
+          type="password"
+          id="login-pin"
+          class="auth-input"
+          inputmode="numeric"
+          maxlength="6"
+          placeholder="••••"
+          autofocus
+          onkeydown="if (event.key === 'Enter') executeLogin();"
+        />
+        <button class="btn btn-primary" onclick="executeLogin()">
+          Ingresar a Turno
+        </button>
+        <div
+          id="login-error"
+          style="
+            color: var(--danger);
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 12px;
+            min-height: 18px;
+          "
+        ></div>
+      </div>
     </div>
 
-    <div class="container">
-      <!-- 1. TAB PICK & PACK (ESCANEO Y DESPACHO RÁPIDO) -->
-      <div id="view-dispatch">
+    <!-- ENCABEZADO SUPERIOR -->
+    <header class="topbar">
+      <div class="brand-title">KINDO <span>OPS</span></div>
+      <div class="user-pill" id="user-display">Turno Inactivo</div>
+    </header>
+
+    <main class="container">
+      <!-- KPI SUMMARY BAR -->
+      <div class="kpi-row">
+        <div class="kpi-block">
+          <div class="kpi-val" id="kpi-units">0</div>
+          <div class="kpi-lbl">Unidades Físicas</div>
+        </div>
+        <div class="kpi-block">
+          <div class="kpi-val" id="kpi-alerts" style="color: var(--warning)">
+            0
+          </div>
+          <div class="kpi-lbl">Alertas ROP</div>
+        </div>
+        <div class="kpi-block">
+          <div class="kpi-val" id="kpi-sync">🟡</div>
+          <div class="kpi-lbl">Estado Sheet</div>
+        </div>
+      </div>
+
+      <!-- PESTAÑA 1: PICK & PACK (DESPACHO) -->
+      <section id="view-dispatch">
         <div class="card">
-          <h3 style="margin-bottom: 8px">Lector / Despacho Inmediato</h3>
+          <h3 style="font-size: 1rem; margin-bottom: 4px">
+            Despacho de Pedidos
+          </h3>
           <p
             style="
-              font-size: 0.85rem;
+              font-size: 0.8rem;
               color: var(--text-muted);
               margin-bottom: 14px;
             "
           >
-            Escaneá el código EAN-13 con el lector óptico o ingresá el código
-            SKU manual.
+            Escaneá el código EAN/SKU con o sin asteriscos.
           </p>
 
-          <input
-            type="text"
-            id="scanInput"
-            class="input-box"
-            placeholder="🔍 Escanear código de barras EAN-13..."
-            autofocus
-            onkeydown="if (event.key === 'Enter') executeDispatch();"
-          />
-
-          <div
-            style="
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 8px;
-              margin-bottom: 14px;
-            "
+          <button
+            class="btn btn-camera"
+            id="btn-cam"
+            onclick="toggleCameraScanner()"
           >
-            <select
-              id="dispatchCanal"
-              class="input-box"
-              style="margin-bottom: 0"
-            >
-              <option value="Uber Flash (CBA Capital)">
-                🛵 Uber Flash (CBA)
-              </option>
-              <option value="Andreani (Federal)">🚛 Andreani (Federal)</option>
-              <option value="Retiro en Dark Store">🏬 Retiro Depósito</option>
-            </select>
-            <input
-              type="number"
-              id="dispatchCant"
-              class="input-box"
-              value="1"
-              min="1"
-              style="margin-bottom: 0"
-            />
+            📷 Activar Escáner de Cámara
+          </button>
+          <div id="reader-container">
+            <div id="reader" style="width: 100%"></div>
           </div>
 
-          <button class="btn btn-dispatch" onclick="executeDispatch()">
-            Confirmar Pick & Pack
+          <label class="field-label">Código EAN-13 o SKU</label>
+          <input
+            type="text"
+            id="dispatch-code"
+            class="input-control"
+            placeholder="Ej: 7791234567814 o KND-REM..."
+            onkeydown="if (event.key === 'Enter') submitDispatch();"
+          />
+
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px">
+            <div>
+              <label class="field-label">Canal Logístico</label>
+              <select id="dispatch-canal" class="input-control">
+                <option value="Uber Flash (Cba Capital)">
+                  🛵 Uber Flash (CBA)
+                </option>
+                <option value="Andreani (Federal)">
+                  🚛 Andreani (Federal)
+                </option>
+                <option value="Retiro Dark Store">🏬 Retiro Local</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Cantidad</label>
+              <input
+                type="number"
+                id="dispatch-cant"
+                class="input-control"
+                value="1"
+                min="1"
+              />
+            </div>
+          </div>
+
+          <button class="btn btn-primary" onclick="submitDispatch()">
+            Confirmar Despacho (Pick & Pack)
           </button>
         </div>
 
         <div class="card">
-          <h4
-            style="
-              margin-bottom: 10px;
-              font-size: 0.9rem;
-              color: var(--text-muted);
-            "
-          >
-            ÚLTIMOS MOVIMIENTOS
-          </h4>
+          <label class="field-label">Último Movimiento Registrado</label>
           <div
-            id="dispatchLog"
+            id="dispatch-feedback"
             style="font-size: 0.85rem; color: var(--text-muted)"
           >
-            Sin movimientos en la sesión actual.
+            Sin actividad en esta sesión.
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- 2. TAB STOCK Y CONTROL DE ESTADOS -->
-      <div id="view-stock" style="display: none">
+      <!-- PESTAÑA 2: INVENTARIO & REORDEN -->
+      <section id="view-stock" style="display: none">
         <input
           type="text"
-          id="filterStock"
-          class="input-box"
-          placeholder="🔍 Buscar por nombre o SKU..."
-          oninput="renderStockList()"
+          id="stock-search"
+          class="input-control"
+          placeholder="🔍 Filtrar por nombre, talle o SKU..."
+          oninput="renderStockView()"
         />
-        <div id="stockListContainer">Cargando inventario...</div>
-      </div>
+        <div id="stock-container">Cargando catálogo unificado...</div>
+      </section>
 
-      <!-- 3. TAB TABLERO DE CONTROL -->
-      <div id="view-kpis" style="display: none">
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <div class="num" id="kpiTotalUnits">0</div>
-            <div class="lbl">Unidades Físicas</div>
-          </div>
-          <div class="kpi-card">
-            <div class="num" id="kpiTotalVal">$0</div>
-            <div class="lbl">Valor Inventario</div>
-          </div>
-          <div class="kpi-card">
-            <div class="num" id="kpiAlerts" style="color: var(--danger)">0</div>
-            <div class="lbl">En Reorden / Quiebre</div>
-          </div>
-        </div>
-
+      <!-- PESTAÑA 3: INGRESO DE PROVEEDORES -->
+      <section id="view-reception" style="display: none">
         <div class="card">
-          <h4 style="margin-bottom: 12px; font-size: 0.9rem">
-            Distribución por Categoría
-          </h4>
-          <div style="height: 200px"><canvas id="chartCat"></canvas></div>
+          <h3 style="font-size: 1rem; margin-bottom: 4px">
+            Recepción de Confección
+          </h3>
+          <p
+            style="
+              font-size: 0.8rem;
+              color: var(--text-muted);
+              margin-bottom: 14px;
+            "
+          >
+            Ingreso de stock desde talleres mayoristas.
+          </p>
+
+          <label class="field-label">SKU o Código de Barras</label>
+          <input
+            type="text"
+            id="rec-code"
+            class="input-control"
+            placeholder="Escanear o tipear artículo..."
+          />
+
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px">
+            <div>
+              <label class="field-label">Proveedor / Taller</label>
+              <select id="rec-prov" class="input-control">
+                <option value="Cba Textil (Básicos)">Cba Textil</option>
+                <option value="QIWE (Estampería)">QIWE</option>
+                <option value="Ajuste Manual Inventario">
+                  Ajuste de Stock
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Unidades</label>
+              <input
+                type="number"
+                id="rec-cant"
+                class="input-control"
+                placeholder="10"
+                min="1"
+              />
+            </div>
+          </div>
+
+          <button
+            class="btn btn-primary"
+            style="background: var(--success)"
+            onclick="submitReception()"
+          >
+            Ingresar al Inventario Físico
+          </button>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
+
+    <!-- NAVEGACIÓN MOBILE FIRST INFERIOR -->
+    <nav class="nav-tabs">
+      <button class="tab-item active" onclick="switchNav('dispatch', this)">
+        <span>📦</span> Despacho
+      </button>
+      <button class="tab-item" onclick="switchNav('stock', this)">
+        <span>📋</span> Stock & ROP
+      </button>
+      <button class="tab-item" onclick="switchNav('reception', this)">
+        <span>📥</span> Recepción
+      </button>
+      <button class="tab-item" onclick="forceLogout()">
+        <span>🔒</span> Salir
+      </button>
+    </nav>
 
     <script>
-      // URL del Web App de Apps Script
+      // ==========================================
+      // CONFIGURACIÓN CENTRAL DEL HUB
+      // ==========================================
       const GAS_URL =
-        "https://script.google.com/macros/s/AKfycbxFWAZ00PqdswIasjKV0T_qT7yqUliFD-6EybpXVhslgxthhIiIzcJKU_TMLwYjMcek/exec";
-      let stockData = [];
-      let chartInstance = null;
+        "https://script.google.com/macros/s/AKfycbxRNFMyPa1akVnKLBIm4HpgcNSDMcFYEEsqff4W7EiUF2O4WKcwN7V3v9DUX0Vtmy0F/exec";
+      const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000; // 8 Horas exactas de turno
 
-      function init() {
-        loadStockFromSheet();
+      let currentUser = null;
+      let catalog = [];
+      let html5QrCode = null;
+      let isCameraActive = false;
+
+      // Normalizador que remueve asteriscos de Libre Barcode 39, guiones y espacios
+      function sanitizeToken(t) {
+        return String(t || "")
+          .replace(/[\*\s\-]/g, "")
+          .toUpperCase()
+          .trim();
       }
 
-      function loadStockFromSheet() {
-        document.getElementById("syncStatus").innerText = "🟡 Sincronizando...";
-        const cbName = "onStockLoaded_" + Date.now();
+      // GESTIÓN DE SESIÓN DE 8 HORAS
+      function verifySession() {
+        const stored = localStorage.getItem("kindo_session_data");
+        const stamp = localStorage.getItem("kindo_session_stamp");
+
+        if (stored && stamp) {
+          const elapsed = Date.now() - parseInt(stamp, 10);
+          if (elapsed < SESSION_TIMEOUT_MS) {
+            currentUser = JSON.parse(stored);
+            document.getElementById("user-display").innerText =
+              currentUser.nombre;
+            document.getElementById("login-modal").style.display = "none";
+            fetchStock();
+            return;
+          }
+        }
+        forceLogout();
+      }
+
+      function executeLogin() {
+        const pin = document.getElementById("login-pin").value.trim();
+        const err = document.getElementById("login-error");
+        if (!pin) return;
+
+        err.innerText = "⏳ Verificando credenciales...";
+        callAPI("login", { pin: pin }, (res) => {
+          if (res && res.status === "success") {
+            currentUser = res.user;
+            localStorage.setItem(
+              "kindo_session_data",
+              JSON.stringify(currentUser),
+            );
+            localStorage.setItem("kindo_session_stamp", Date.now().toString());
+            document.getElementById("user-display").innerText =
+              currentUser.nombre;
+            document.getElementById("login-modal").style.display = "none";
+            err.innerText = "";
+            fetchStock();
+          } else {
+            err.innerText = res.message || "PIN no autorizado.";
+          }
+        });
+      }
+
+      function forceLogout() {
+        localStorage.removeItem("kindo_session_data");
+        localStorage.removeItem("kindo_session_stamp");
+        if (html5QrCode && isCameraActive) html5QrCode.stop();
+        location.reload();
+      }
+
+      // CONECTOR JSONP ROBUSTO
+      function callAPI(action, params, callback) {
+        const cbName =
+          "kindo_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
         const script = document.createElement("script");
 
-        window[cbName] = function (res) {
-          if (res && res.status === "success") {
-            stockData = res.data;
-            document.getElementById("syncStatus").innerText = "🟢 Conectado";
-            renderStockList();
-            updateKPIs();
-          }
+        window[cbName] = function (data) {
+          callback(data);
           delete window[cbName];
           if (script.parentNode) script.parentNode.removeChild(script);
         };
 
-        script.src = `${GAS_URL}?action=getStock&callback=${cbName}`;
+        let qs = `${GAS_URL}?action=${action}&callback=${cbName}`;
+        for (const k in params) {
+          qs += `&${k}=${encodeURIComponent(params[k])}`;
+        }
+
+        script.src = qs;
+        script.onerror = () => {
+          document.getElementById("kpi-sync").innerText = "🔴";
+          alert("Error de conexión con el backend de Google Sheets.");
+        };
         document.body.appendChild(script);
       }
 
-      function executeDispatch() {
-        const code = document.getElementById("scanInput").value.trim();
-        const canal = document.getElementById("dispatchCanal").value;
-        const cant =
-          parseInt(document.getElementById("dispatchCant").value) || 1;
-        if (!code) return;
+      // LECTURA DE STOCK
+      function fetchStock() {
+        document.getElementById("kpi-sync").innerText = "🟡";
+        callAPI("getStock", {}, (res) => {
+          if (res && res.status === "success") {
+            catalog = res.data;
+            document.getElementById("kpi-sync").innerText = "🟢";
+            updateKPIs();
+            renderStockView();
+          }
+        });
+      }
 
-        const item = stockData.find(
-          (i) => i.ean === code || i.sku.toLowerCase() === code.toLowerCase(),
+      // ACTUALIZACIÓN DE INDICADORES VISUALES
+      function updateKPIs() {
+        const totalUnits = catalog.reduce(
+          (sum, item) => sum + item.stockActual,
+          0,
+        );
+        const alertsCount = catalog.filter(
+          (item) => item.estado !== "OK",
+        ).length;
+
+        document.getElementById("kpi-units").innerText = totalUnits;
+        document.getElementById("kpi-alerts").innerText = alertsCount;
+      }
+
+      // DISPATCH / PICK & PACK
+      function submitDispatch() {
+        const rawCode = document.getElementById("dispatch-code").value;
+        const cleanCode = sanitizeToken(rawCode);
+        const canal = document.getElementById("dispatch-canal").value;
+        const cant =
+          parseInt(document.getElementById("dispatch-cant").value, 10) || 1;
+
+        if (!cleanCode) return;
+
+        const item = catalog.find(
+          (i) =>
+            sanitizeToken(i.ean) === cleanCode ||
+            sanitizeToken(i.sku) === cleanCode,
         );
         if (!item) {
-          alert("Artículo no encontrado con ese código EAN o SKU.");
+          alert(
+            "El código ingresado no coincide con ningún artículo del catálogo.",
+          );
           return;
         }
 
-        // Optimistic UI Update
+        // Actualización optimista de UI
         item.stockActual -= cant;
-        item.egresos += cant;
         if (item.stockActual <= 0) item.estado = "QUIEBRE";
-        else if (item.stockActual <= item.puntoPedido) item.estado = "REORDEN";
+        else if (item.stockActual <= item.ptoPedido) item.estado = "REORDEN";
 
-        const cbName = "onDispatch_" + Date.now();
-        const script = document.createElement("script");
-        window[cbName] = function (res) {
-          delete window[cbName];
-          if (script.parentNode) script.parentNode.removeChild(script);
-        };
-        script.src = `${GAS_URL}?action=dispatchItem&sku=${encodeURIComponent(item.sku)}&cant=${cant}&canal=${encodeURIComponent(canal)}&author=Operador&callback=${cbName}`;
-        document.body.appendChild(script);
+        updateKPIs();
+        renderStockView();
 
-        // Log visual en la pantalla
-        const logBox = document.getElementById("dispatchLog");
+        const logBox = document.getElementById("dispatch-feedback");
         const time = new Date().toLocaleTimeString("es-AR", {
           hour: "2-digit",
           minute: "2-digit",
+          second: "2-digit",
         });
-        logBox.innerHTML =
-          `<div>✓ [${time}] Despachado: <b>${cant}u</b> ${item.descripcion} vía ${canal}</div>` +
-          (logBox.innerHTML.includes("Sin movimientos")
-            ? ""
-            : logBox.innerHTML);
+        logBox.innerHTML = `<span style="color: var(--success); font-weight:700;">✓ [${time}]</span> Despachadas ${cant}u de <b>${item.desc}</b> (${canal})`;
 
-        document.getElementById("scanInput").value = "";
-        document.getElementById("scanInput").focus();
-        renderStockList();
-        updateKPIs();
+        document.getElementById("dispatch-code").value = "";
+        document.getElementById("dispatch-code").focus();
+
+        callAPI(
+          "dispatch",
+          {
+            code: cleanCode,
+            cant: cant,
+            canal: canal,
+            author: currentUser.nombre,
+          },
+          (res) => {
+            if (!res || res.status !== "success") fetchStock();
+          },
+        );
       }
 
-      function renderStockList() {
-        const q = document
-          .getElementById("filterStock")
-          .value.toLowerCase()
-          .trim();
-        const container = document.getElementById("stockListContainer");
+      // RECEPCIÓN DE PROVEEDORES
+      function submitReception() {
+        const rawCode = document.getElementById("rec-code").value;
+        const cleanCode = sanitizeToken(rawCode);
+        const prov = document.getElementById("rec-prov").value;
+        const cant =
+          parseInt(document.getElementById("rec-cant").value, 10) || 0;
+
+        if (!cleanCode || cant <= 0) {
+          alert("Ingresá un código y una cantidad válida mayor a cero.");
+          return;
+        }
+
+        callAPI(
+          "receive",
+          {
+            code: cleanCode,
+            cant: cant,
+            prov: prov,
+            author: currentUser.nombre,
+          },
+          (res) => {
+            if (res && res.status === "success") {
+              alert(`¡Ingreso de ${cant}u confirmado para SKU: ${res.sku}!`);
+              document.getElementById("rec-code").value = "";
+              document.getElementById("rec-cant").value = "";
+              fetchStock();
+              switchNav("stock", document.querySelectorAll(".tab-item")[1]);
+            } else {
+              alert(
+                "Error: " + (res.message || "No se pudo registrar el ingreso."),
+              );
+            }
+          },
+        );
+      }
+
+      // RENDERIZADO DE INVENTARIO
+      function renderStockView() {
+        const q = sanitizeToken(document.getElementById("stock-search").value);
+        const container = document.getElementById("stock-container");
         container.innerHTML = "";
 
-        const filtered = stockData.filter(
-          (i) =>
+        const filtered = catalog.filter((i) => {
+          return (
             !q ||
-            i.descripcion.toLowerCase().includes(q) ||
-            i.sku.toLowerCase().includes(q),
-        );
+            sanitizeToken(i.desc).includes(q) ||
+            sanitizeToken(i.sku).includes(q) ||
+            sanitizeToken(i.ean).includes(q)
+          );
+        });
+
+        if (filtered.length === 0) {
+          container.innerHTML =
+            '<div style="text-align:center; padding: 20px; color: var(--text-muted);">No hay artículos que coincidan.</div>';
+          return;
+        }
 
         filtered.forEach((item) => {
-          const badgeClass =
+          const badgeStyle =
             item.estado === "QUIEBRE"
               ? "badge-quiebre"
               : item.estado === "REORDEN"
                 ? "badge-reorden"
                 : "badge-ok";
+          const cardClass =
+            item.estado === "QUIEBRE"
+              ? "quiebre"
+              : item.estado === "REORDEN"
+                ? "reorden"
+                : "";
+
           const div = document.createElement("div");
-          div.className = `item-card ${item.estado.toLowerCase()}`;
+          div.className = `stock-card ${cardClass}`;
           div.innerHTML = `
           <div>
-            <div class="item-title">${item.descripcion}</div>
-            <div class="item-sub">SKU: ${item.sku} | ROP: ${item.puntoPedido}u | Seg: ${item.stockSeg}u</div>
+            <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 2px;">${item.desc}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
+              SKU: ${item.sku} | ROP: ${item.ptoPedido}u | Seg: ${item.stockSeg}u
+            </div>
           </div>
           <div style="text-align: right;">
-            <div class="badge-stock ${badgeClass}">${item.stockActual} u</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">${item.estado}</div>
+            <div class="badge ${badgeStyle}">${item.stockActual} u</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; margin-top: 4px;">${item.estado}</div>
           </div>
         `;
           container.appendChild(div);
         });
       }
 
-      function updateKPIs() {
-        const totUnits = stockData.reduce((acc, i) => acc + i.stockActual, 0);
-        const totVal = stockData.reduce(
-          (acc, i) => acc + i.stockActual * i.costo,
-          0,
-        );
-        const alerts = stockData.filter((i) => i.estado !== "OK").length;
+      // ESCÁNER DE CÁMARA NATIVO
+      function toggleCameraScanner() {
+        const readerDiv = document.getElementById("reader-container");
+        const btn = document.getElementById("btn-cam");
 
-        document.getElementById("kpiTotalUnits").innerText = totUnits;
-        document.getElementById("kpiTotalVal").innerText =
-          "$" + totVal.toLocaleString("es-AR");
-        document.getElementById("kpiAlerts").innerText = alerts;
+        if (isCameraActive) {
+          html5QrCode.stop().then(() => {
+            readerDiv.style.display = "none";
+            btn.innerText = "📷 Activar Escáner de Cámara";
+            isCameraActive = false;
+          });
+        } else {
+          readerDiv.style.display = "block";
+          btn.innerText = "⏹ Apagar Cámara";
+          html5QrCode = new Html5Qrcode("reader");
+
+          html5QrCode
+            .start(
+              { facingMode: "environment" },
+              { fps: 10, qrbox: { width: 250, height: 120 } },
+              (decodedText) => {
+                document.getElementById("dispatch-code").value =
+                  sanitizeToken(decodedText);
+                toggleCameraScanner();
+                submitDispatch();
+              },
+              () => {}, // Ignorar frames sin código
+            )
+            .then(() => {
+              isCameraActive = true;
+            })
+            .catch(() => {
+              alert("No se pudo acceder a la cámara trasera.");
+              readerDiv.style.display = "none";
+              btn.innerText = "📷 Activar Escáner de Cámara";
+              isCameraActive = false;
+            });
+        }
       }
 
-      function switchTab(tab, btn) {
+      // NAVEGACIÓN ENTRE SECCIONES
+      function switchNav(view, btn) {
         document.getElementById("view-dispatch").style.display =
-          tab === "dispatch" ? "block" : "none";
+          view === "dispatch" ? "block" : "none";
         document.getElementById("view-stock").style.display =
-          tab === "stock" ? "block" : "none";
-        document.getElementById("view-kpis").style.display =
-          tab === "kpis" ? "block" : "none";
+          view === "stock" ? "block" : "none";
+        document.getElementById("view-reception").style.display =
+          view === "reception" ? "block" : "none";
+
         document
-          .querySelectorAll(".tab-btn")
+          .querySelectorAll(".tab-item")
           .forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
+
+        if (view === "stock") renderStockView();
       }
 
-      window.onload = init;
+      window.onload = verifySession;
     </script>
   </body>
 </html>
