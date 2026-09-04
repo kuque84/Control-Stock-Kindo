@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KINDO - Dark Store Hub General Paz</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      :root {
+        --primary: #0f172a;
+        --accent: #6366f1;
+        --success: #16a34a;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --border: #e2e8f0;
+        --text: #1e293b;
+        --text-muted: #64748b;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Roboto", sans-serif;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        padding-bottom: 70px;
+      }
+
+      /* Navbar */
+      .navbar {
+        background: var(--primary);
+        color: white;
+        padding: 12px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      .brand {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 1.1rem;
+        letter-spacing: 1px;
+      }
+      .badge-status {
+        background: #334155;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+      }
+
+      /* Tab Bar */
+      .tab-bar {
+        display: flex;
+        background: white;
+        border-bottom: 1px solid var(--border);
+      }
+      .tab-btn {
+        flex: 1;
+        padding: 14px 8px;
+        border: none;
+        background: none;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+      }
+      .tab-btn.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+
+      .container {
+        max-width: 720px;
+        margin: 16px auto;
+        padding: 0 12px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+
+      /* KPIs Grid */
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .kpi-card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        text-align: center;
+      }
+      .kpi-card .num {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--primary);
+        font-family: "JetBrains Mono", monospace;
+      }
+      .kpi-card .lbl {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-weight: 700;
+        margin-top: 4px;
+      }
+
+      /* Inputs */
+      .input-box {
+        width: 100%;
+        padding: 14px;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        font-size: 1rem;
+        margin-bottom: 12px;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .input-box:focus {
+        border-color: var(--accent);
+      }
+
+      .btn {
+        width: 100%;
+        padding: 14px;
+        border-radius: 8px;
+        border: none;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+        color: white;
+        background: var(--accent);
+      }
+      .btn:hover {
+        opacity: 0.95;
+      }
+      .btn-dispatch {
+        background: var(--primary);
+      }
+
+      /* Lista de Items */
+      .item-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 8px;
+        background: white;
+      }
+      .item-card.reorden {
+        border-left: 5px solid var(--warning);
+      }
+      .item-card.quiebre {
+        border-left: 5px solid var(--danger);
+      }
+      .item-title {
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: var(--primary);
+      }
+      .item-sub {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+      .badge-stock {
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        font-family: "JetBrains Mono", monospace;
+      }
+      .badge-ok {
+        background: #dcfce7;
+        color: #15803d;
+      }
+      .badge-reorden {
+        background: #fef3c7;
+        color: #b45309;
+      }
+      .badge-quiebre {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar">
+      <div class="brand">KINDO // DARK STORE</div>
+      <div class="badge-status" id="syncStatus">🟢 Conectado</div>
+    </nav>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('dispatch', this)">
+        📦 Pick & Pack
+      </button>
+      <button class="tab-btn" onclick="switchTab('stock', this)">
+        📋 Stock & Alertas
+      </button>
+      <button class="tab-btn" onclick="switchTab('kpis', this)">
+        📊 Tablero KPIs
+      </button>
+    </div>
+
+    <div class="container">
+      <!-- 1. TAB PICK & PACK (ESCANEO Y DESPACHO RÁPIDO) -->
+      <div id="view-dispatch">
+        <div class="card">
+          <h3 style="margin-bottom: 8px">Lector / Despacho Inmediato</h3>
+          <p
+            style="
+              font-size: 0.85rem;
+              color: var(--text-muted);
+              margin-bottom: 14px;
+            "
+          >
+            Escaneá el código EAN-13 con el lector óptico o ingresá el código
+            SKU manual.
+          </p>
+
+          <input
+            type="text"
+            id="scanInput"
+            class="input-box"
+            placeholder="🔍 Escanear código de barras EAN-13..."
+            autofocus
+            onkeydown="if (event.key === 'Enter') executeDispatch();"
+          />
+
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8px;
+              margin-bottom: 14px;
+            "
+          >
+            <select
+              id="dispatchCanal"
+              class="input-box"
+              style="margin-bottom: 0"
+            >
+              <option value="Uber Flash (CBA Capital)">
+                🛵 Uber Flash (CBA)
+              </option>
+              <option value="Andreani (Federal)">🚛 Andreani (Federal)</option>
+              <option value="Retiro en Dark Store">🏬 Retiro Depósito</option>
+            </select>
+            <input
+              type="number"
+              id="dispatchCant"
+              class="input-box"
+              value="1"
+              min="1"
+              style="margin-bottom: 0"
+            />
+          </div>
+
+          <button class="btn btn-dispatch" onclick="executeDispatch()">
+            Confirmar Pick & Pack
+          </button>
+        </div>
+
+        <div class="card">
+          <h4
+            style="
+              margin-bottom: 10px;
+              font-size: 0.9rem;
+              color: var(--text-muted);
+            "
+          >
+            ÚLTIMOS MOVIMIENTOS
+          </h4>
+          <div
+            id="dispatchLog"
+            style="font-size: 0.85rem; color: var(--text-muted)"
+          >
+            Sin movimientos en la sesión actual.
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. TAB STOCK Y CONTROL DE ESTADOS -->
+      <div id="view-stock" style="display: none">
+        <input
+          type="text"
+          id="filterStock"
+          class="input-box"
+          placeholder="🔍 Buscar por nombre o SKU..."
+          oninput="renderStockList()"
+        />
+        <div id="stockListContainer">Cargando inventario...</div>
+      </div>
+
+      <!-- 3. TAB TABLERO DE CONTROL -->
+      <div id="view-kpis" style="display: none">
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="num" id="kpiTotalUnits">0</div>
+            <div class="lbl">Unidades Físicas</div>
+          </div>
+          <div class="kpi-card">
+            <div class="num" id="kpiTotalVal">$0</div>
+            <div class="lbl">Valor Inventario</div>
+          </div>
+          <div class="kpi-card">
+            <div class="num" id="kpiAlerts" style="color: var(--danger)">0</div>
+            <div class="lbl">En Reorden / Quiebre</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4 style="margin-bottom: 12px; font-size: 0.9rem">
+            Distribución por Categoría
+          </h4>
+          <div style="height: 200px"><canvas id="chartCat"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // URL del Web App de Apps Script
+      const GAS_URL =
+        "https://script.google.com/macros/s/AKfycbxRNFMyPa1akVnKLBIm4HpgcNSDMcFYEEsqff4W7EiUF2O4WKcwN7V3v9DUX0Vtmy0F/exec";
+      let stockData = [];
+      let chartInstance = null;
+
+      function init() {
+        loadStockFromSheet();
+      }
+
+      function loadStockFromSheet() {
+        document.getElementById("syncStatus").innerText = "🟡 Sincronizando...";
+        const cbName = "onStockLoaded_" + Date.now();
+        const script = document.createElement("script");
+
+        window[cbName] = function (res) {
+          if (res && res.status === "success") {
+            stockData = res.data;
+            document.getElementById("syncStatus").innerText = "🟢 Conectado";
+            renderStockList();
+            updateKPIs();
+          }
+          delete window[cbName];
+          if (script.parentNode) script.parentNode.removeChild(script);
+        };
+
+        script.src = `${GAS_URL}?action=getStock&callback=${cbName}`;
+        document.body.appendChild(script);
+      }
+
+      function executeDispatch() {
+        const code = document.getElementById("scanInput").value.trim();
+        const canal = document.getElementById("dispatchCanal").value;
+        const cant =
+          parseInt(document.getElementById("dispatchCant").value) || 1;
+        if (!code) return;
+
+        const item = stockData.find(
+          (i) => i.ean === code || i.sku.toLowerCase() === code.toLowerCase(),
+        );
+        if (!item) {
+          alert("Artículo no encontrado con ese código EAN o SKU.");
+          return;
+        }
+
+        // Optimistic UI Update
+        item.stockActual -= cant;
+        item.egresos += cant;
+        if (item.stockActual <= 0) item.estado = "QUIEBRE";
+        else if (item.stockActual <= item.puntoPedido) item.estado = "REORDEN";
+
+        const cbName = "onDispatch_" + Date.now();
+        const script = document.createElement("script");
+        window[cbName] = function (res) {
+          delete window[cbName];
+          if (script.parentNode) script.parentNode.removeChild(script);
+        };
+        script.src = `${GAS_URL}?action=dispatchItem&sku=${encodeURIComponent(item.sku)}&cant=${cant}&canal=${encodeURIComponent(canal)}&author=Operador&callback=${cbName}`;
+        document.body.appendChild(script);
+
+        // Log visual en la pantalla
+        const logBox = document.getElementById("dispatchLog");
+        const time = new Date().toLocaleTimeString("es-AR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        logBox.innerHTML =
+          `<div>✓ [${time}] Despachado: <b>${cant}u</b> ${item.descripcion} vía ${canal}</div>` +
+          (logBox.innerHTML.includes("Sin movimientos")
+            ? ""
+            : logBox.innerHTML);
+
+        document.getElementById("scanInput").value = "";
+        document.getElementById("scanInput").focus();
+        renderStockList();
+        updateKPIs();
+      }
+
+      function renderStockList() {
+        const q = document
+          .getElementById("filterStock")
+          .value.toLowerCase()
+          .trim();
+        const container = document.getElementById("stockListContainer");
+        container.innerHTML = "";
+
+        const filtered = stockData.filter(
+          (i) =>
+            !q ||
+            i.descripcion.toLowerCase().includes(q) ||
+            i.sku.toLowerCase().includes(q),
+        );
+
+        filtered.forEach((item) => {
+          const badgeClass =
+            item.estado === "QUIEBRE"
+              ? "badge-quiebre"
+              : item.estado === "REORDEN"
+                ? "badge-reorden"
+                : "badge-ok";
+          const div = document.createElement("div");
+          div.className = `item-card ${item.estado.toLowerCase()}`;
+          div.innerHTML = `
+          <div>
+            <div class="item-title">${item.descripcion}</div>
+            <div class="item-sub">SKU: ${item.sku} | ROP: ${item.puntoPedido}u | Seg: ${item.stockSeg}u</div>
+          </div>
+          <div style="text-align: right;">
+            <div class="badge-stock ${badgeClass}">${item.stockActual} u</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">${item.estado}</div>
+          </div>
+        `;
+          container.appendChild(div);
+        });
+      }
+
+      function updateKPIs() {
+        const totUnits = stockData.reduce((acc, i) => acc + i.stockActual, 0);
+        const totVal = stockData.reduce(
+          (acc, i) => acc + i.stockActual * i.costo,
+          0,
+        );
+        const alerts = stockData.filter((i) => i.estado !== "OK").length;
+
+        document.getElementById("kpiTotalUnits").innerText = totUnits;
+        document.getElementById("kpiTotalVal").innerText =
+          "$" + totVal.toLocaleString("es-AR");
+        document.getElementById("kpiAlerts").innerText = alerts;
+      }
+
+      function switchTab(tab, btn) {
+        document.getElementById("view-dispatch").style.display =
+          tab === "dispatch" ? "block" : "none";
+        document.getElementById("view-stock").style.display =
+          tab === "stock" ? "block" : "none";
+        document.getElementById("view-kpis").style.display =
+          tab === "kpis" ? "block" : "none";
+        document
+          .querySelectorAll(".tab-btn")
+          .forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+      }
+
+      window.onload = init;
+    </script>
+  </body>
+</html>
