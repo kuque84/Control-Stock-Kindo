@@ -211,9 +211,16 @@
         background: var(--primary);
         color: white;
       }
-      .btn-primary:active {
+      .btn-primary:active:not(:disabled) {
         transform: scale(0.98);
         background: var(--primary-hover);
+      }
+      .btn-primary:disabled {
+        background: #1e293b;
+        color: #475569;
+        cursor: not-allowed;
+        border: 1px solid var(--surface-border);
+        transform: none;
       }
       .btn-camera {
         background: #1e293b;
@@ -396,6 +403,7 @@
             id="dispatch-code"
             class="input-control"
             placeholder="Ej: 7791234567814 o KND-REM..."
+            oninput="checkDispatchBtn()"
             onkeydown="if (event.key === 'Enter') submitDispatch();"
           />
 
@@ -424,7 +432,12 @@
             </div>
           </div>
 
-          <button class="btn btn-primary" onclick="submitDispatch()">
+          <button
+            class="btn btn-primary"
+            id="btn-submit-dispatch"
+            disabled
+            onclick="submitDispatch()"
+          >
             Confirmar Despacho (Pick & Pack)
           </button>
         </div>
@@ -527,31 +540,35 @@
     </nav>
 
     <script>
-      // URL DE TU APPS SCRIPT
+      // ENDPOINT APPS SCRIPT OFICIAL
       const GAS_URL =
         "https://script.google.com/macros/s/AKfycbxFWAZ00PqdswIasjKV0T_qT7yqUliFD-6EybpXVhslgxthhIiIzcJKU_TMLwYjMcek/exec";
-      const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000; // 8 Horas exactas
+      const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;
 
       let currentUser = null;
       let catalog = [];
       let html5QrCode = null;
       let isCameraActive = false;
 
-      // LIMPIEZA INTELIGENTE: quita asteriscos, espacios y el '5' fantasma si se cuela al escanear
+      // Validación de estado del botón Confirmar
+      function checkDispatchBtn() {
+        const val = document.getElementById("dispatch-code").value.trim();
+        document.getElementById("btn-submit-dispatch").disabled =
+          val.length === 0;
+      }
+
+      // Normalización de código
       function sanitizeToken(t) {
         let clean = String(t || "")
           .replace(/[\*\s\-]/g, "")
           .toUpperCase()
           .trim();
-
-        // Si la cámara leyó 14 dígitos arrancando con 5779..., le quitamos el 5 inicial
         if (clean.length === 14 && clean.startsWith("5779")) {
           clean = clean.substring(1);
         }
         return clean;
       }
 
-      // GESTIÓN DE SESIÓN DE 8 HORAS (SIN LOOP DE RELOAD)
       function verifySession() {
         const stored = localStorage.getItem("kindo_session_data");
         const stamp = localStorage.getItem("kindo_session_stamp");
@@ -568,7 +585,6 @@
           }
         }
 
-        // Si no hay sesión o expiraron las 8 hs: mostrar el modal sin recargar
         localStorage.removeItem("kindo_session_data");
         localStorage.removeItem("kindo_session_stamp");
         document.getElementById("login-modal").style.display = "flex";
@@ -623,7 +639,6 @@
         document.getElementById("login-modal").style.display = "flex";
       }
 
-      // CONECTOR JSONP CON APPS SCRIPT
       function callAPI(action, params, callback) {
         const cbName =
           "kindo_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
@@ -648,7 +663,6 @@
         document.body.appendChild(script);
       }
 
-      // LECTURA DE STOCK
       function fetchStock() {
         document.getElementById("kpi-sync").innerText = "🟡";
         callAPI("getStock", {}, (res) => {
@@ -674,9 +688,10 @@
         document.getElementById("kpi-alerts").innerText = alertsCount;
       }
 
-      // DESPACHO / PICK & PACK (CON MATCH FLEXIBLE)
+      // CONFIRMACIÓN DE DESPACHO
       function submitDispatch() {
-        const rawCode = document.getElementById("dispatch-code").value;
+        const inputEl = document.getElementById("dispatch-code");
+        const rawCode = inputEl.value;
         const cleanCode = sanitizeToken(rawCode);
         const canal = document.getElementById("dispatch-canal").value;
         const cant =
@@ -684,7 +699,6 @@
 
         if (!cleanCode) return;
 
-        // Match exacto o por terminación si viniera con prefijo
         const item = catalog.find((i) => {
           const itemEan = sanitizeToken(i.ean);
           const itemSku = sanitizeToken(i.sku);
@@ -701,7 +715,7 @@
           return;
         }
 
-        // Actualización inmediata en pantalla (Optimistic UI)
+        // Optimistic update
         item.stockActual -= cant;
         if (item.stockActual <= 0) item.estado = "QUIEBRE";
         else if (item.stockActual <= item.ptoPedido) item.estado = "REORDEN";
@@ -717,8 +731,9 @@
         });
         logBox.innerHTML = `<span style="color: var(--success); font-weight:700;">✓ [${time}]</span> Despachadas ${cant}u de <b>${item.desc}</b> (${canal})`;
 
-        document.getElementById("dispatch-code").value = "";
-        document.getElementById("dispatch-code").focus();
+        inputEl.value = "";
+        checkDispatchBtn();
+        inputEl.focus();
 
         callAPI(
           "dispatch",
@@ -734,7 +749,67 @@
         );
       }
 
-      // RECEPCIÓN DE MERCADERÍA
+      // ESCÁNER DE CÁMARA CORREGIDO
+      function toggleCameraScanner() {
+        const readerDiv = document.getElementById("reader-container");
+        const btn = document.getElementById("btn-cam");
+
+        if (isCameraActive) {
+          html5QrCode
+            .stop()
+            .then(() => {
+              readerDiv.style.display = "none";
+              btn.innerText = "📷 Activar Escáner de Cámara";
+              isCameraActive = false;
+            })
+            .catch(() => {});
+        } else {
+          readerDiv.style.display = "block";
+          btn.innerText = "⏹ Apagar Cámara";
+
+          const formatsToSupport = [
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.EAN_13,
+          ];
+          html5QrCode = new Html5Qrcode("reader", {
+            formatsToSupport: formatsToSupport,
+            verbose: false,
+          });
+
+          html5QrCode
+            .start(
+              { facingMode: "environment" },
+              { fps: 10, qrbox: { width: 250, height: 120 } },
+              (decodedText) => {
+                const parsed = sanitizeToken(decodedText);
+
+                // 1. Escribir en el input
+                const inputEl = document.getElementById("dispatch-code");
+                inputEl.value = parsed;
+
+                // 2. Habilitar botón Confirmar
+                checkDispatchBtn();
+
+                // 3. Feedback táctil
+                if (navigator.vibrate) navigator.vibrate(100);
+
+                // 4. Apagar cámara limpiamente dejando el valor en pantalla
+                toggleCameraScanner();
+              },
+              () => {},
+            )
+            .then(() => {
+              isCameraActive = true;
+            })
+            .catch(() => {
+              alert("No se pudo acceder a la cámara.");
+              readerDiv.style.display = "none";
+              btn.innerText = "📷 Activar Escáner de Cámara";
+              isCameraActive = false;
+            });
+        }
+      }
+
       function submitReception() {
         const rawCode = document.getElementById("rec-code").value;
         const cleanCode = sanitizeToken(rawCode);
@@ -771,7 +846,6 @@
         );
       }
 
-      // LISTADO DE STOCK
       function renderStockView() {
         const q = sanitizeToken(document.getElementById("stock-search").value);
         const container = document.getElementById("stock-container");
@@ -824,56 +898,6 @@
         });
       }
 
-      // ESCÁNER DE CÁMARA CON FORMATOS ESTRICTOS
-      function toggleCameraScanner() {
-        const readerDiv = document.getElementById("reader-container");
-        const btn = document.getElementById("btn-cam");
-
-        if (isCameraActive) {
-          html5QrCode.stop().then(() => {
-            readerDiv.style.display = "none";
-            btn.innerText = "📷 Activar Escáner de Cámara";
-            isCameraActive = false;
-          });
-        } else {
-          readerDiv.style.display = "block";
-          btn.innerText = "⏹ Apagar Cámara";
-
-          // Forzar únicamente Code 39 y EAN-13 para evitar lecturas erróneas
-          const formatsToSupport = [
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.EAN_13,
-          ];
-          html5QrCode = new Html5Qrcode("reader", {
-            formatsToSupport: formatsToSupport,
-            verbose: false,
-          });
-
-          html5QrCode
-            .start(
-              { facingMode: "environment" },
-              { fps: 10, qrbox: { width: 250, height: 120 } },
-              (decodedText) => {
-                document.getElementById("dispatch-code").value =
-                  sanitizeToken(decodedText);
-                toggleCameraScanner();
-                submitDispatch();
-              },
-              () => {}, // Ignorar cuadros sin código
-            )
-            .then(() => {
-              isCameraActive = true;
-            })
-            .catch(() => {
-              alert("No se pudo acceder a la cámara.");
-              readerDiv.style.display = "none";
-              btn.innerText = "📷 Activar Escáner de Cámara";
-              isCameraActive = false;
-            });
-        }
-      }
-
-      // NAVEGACIÓN
       function switchNav(view, btn) {
         document.getElementById("view-dispatch").style.display =
           view === "dispatch" ? "block" : "none";
