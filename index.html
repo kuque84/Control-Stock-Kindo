@@ -577,12 +577,15 @@
           .toUpperCase()
           .trim();
 
-        // Si la cámara leyó '579...' en lugar del código argentino '779...' (13 dígitos)
+        // Si la cámara leyó 579 en vez de 779 (13 dígitos)
         if (clean.length === 13 && clean.startsWith("579")) {
           clean = "7" + clean.substring(1);
         }
-        // Si leyó 14 dígitos con un 5 colado adelante (5779...)
-        if (clean.length === 14 && clean.startsWith("5779")) {
+        // Si leyó 14 dígitos con un 5 o cero adelante (ej: 5779... o 0779...)
+        if (
+          clean.length === 14 &&
+          (clean.startsWith("5779") || clean.startsWith("0779"))
+        ) {
           clean = clean.substring(1);
         }
         return clean;
@@ -693,7 +696,10 @@
         document.getElementById("kpi-sync").innerText = "🟡";
         callAPI("getStock", {}, (res) => {
           if (res && res.status === "success") {
-            catalog = res.data;
+            // Descartamos cualquier fila que sea TOTALES
+            catalog = res.data.filter(
+              (i) => i.sku && !i.sku.toUpperCase().includes("TOTAL"),
+            );
             document.getElementById("kpi-sync").innerText = "🟢";
             updateKPIs();
             renderStockView();
@@ -714,7 +720,7 @@
         document.getElementById("kpi-alerts").innerText = alertsCount;
       }
 
-      // DESPACHO / PICK & PACK (CON FALLBACK FLEXIBLE)
+      // DESPACHO / PICK & PACK (BLINDADO CONTRA STRING VACÍO Y TOTALES)
       function submitDispatch() {
         const inputEl = document.getElementById("dispatch-code");
         const rawCode = inputEl.value;
@@ -725,24 +731,35 @@
 
         if (!cleanCode) return;
 
-        // Match exacto o por terminación (excluyendo TOTALES)
+        // Match estricto: el EAN/SKU del catálogo NO puede estar vacío ni ser TOTALES
         const item = catalog.find((i) => {
+          if (!i.sku || i.sku.toUpperCase().includes("TOTAL")) return false;
+
           const itemEan = sanitizeToken(i.ean);
           const itemSku = sanitizeToken(i.sku);
-          return (
-            itemEan === cleanCode ||
-            itemSku === cleanCode ||
-            (cleanCode.length >= 12 && itemEan.endsWith(cleanCode)) ||
-            (cleanCode.length >= 13 && cleanCode.endsWith(itemEan))
-          );
+
+          // 1. Coincidencia exacta
+          if (itemEan === cleanCode || itemSku === cleanCode) return true;
+
+          // 2. Coincidencia por terminación SOLO si el item tiene EAN cargado (mínimo 8 dígitos)
+          if (itemEan.length >= 8) {
+            if (cleanCode.endsWith(itemEan) || itemEan.endsWith(cleanCode))
+              return true;
+          }
+
+          return false;
         });
 
         if (!item) {
-          alert("No se encontró ningún artículo para el código: " + cleanCode);
+          alert(
+            "❌ No se encontró ningún producto para el código leído:\n[" +
+              cleanCode +
+              "]\n\nVerificá que el SKU o código de barras exista en la planilla.",
+          );
           return;
         }
 
-        // Optimistic update
+        // Optimistic update en pantalla
         item.stockActual -= cant;
         if (item.stockActual <= 0) item.estado = "QUIEBRE";
         else if (item.stockActual <= item.ptoPedido) item.estado = "REORDEN";
