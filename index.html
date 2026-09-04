@@ -563,7 +563,11 @@
             return;
           }
         }
-        forceLogout();
+
+        // Si no hay sesión o expiraron las 8 hs: limpiar y mostrar login
+        localStorage.removeItem("kindo_session_data");
+        localStorage.removeItem("kindo_session_stamp");
+        document.getElementById("login-modal").style.display = "flex";
       }
 
       function executeLogin() {
@@ -594,8 +598,25 @@
       function forceLogout() {
         localStorage.removeItem("kindo_session_data");
         localStorage.removeItem("kindo_session_stamp");
-        if (html5QrCode && isCameraActive) html5QrCode.stop();
-        location.reload();
+        currentUser = null;
+
+        if (html5QrCode && isCameraActive) {
+          html5QrCode
+            .stop()
+            .then(() => {
+              isCameraActive = false;
+              document.getElementById("reader-container").style.display =
+                "none";
+              document.getElementById("btn-cam").innerText =
+                "📷 Activar Escáner de Cámara";
+            })
+            .catch(() => {});
+        }
+
+        document.getElementById("user-display").innerText = "Turno Inactivo";
+        document.getElementById("login-pin").value = "";
+        document.getElementById("login-error").innerText = "";
+        document.getElementById("login-modal").style.display = "flex";
       }
 
       // CONECTOR JSONP ROBUSTO
