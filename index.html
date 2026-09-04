@@ -540,7 +540,7 @@
     </nav>
 
     <script>
-      // ENDPOINT APPS SCRIPT OFICIAL
+      // ENDPOINT OFICIAL APPS SCRIPT
       const GAS_URL =
         "https://script.google.com/macros/s/AKfycbxFWAZ00PqdswIasjKV0T_qT7yqUliFD-6EybpXVhslgxthhIiIzcJKU_TMLwYjMcek/exec";
       const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;
@@ -549,15 +549,28 @@
       let catalog = [];
       let html5QrCode = null;
       let isCameraActive = false;
+      let clientIP = "Detectando...";
 
-      // Validación de estado del botón Confirmar
+      // Obtener IP pública del cliente para el log de auditoría
+      function fetchClientIP() {
+        fetch("https://api.ipify.org?format=json")
+          .then((r) => r.json())
+          .then((d) => {
+            clientIP = d.ip;
+          })
+          .catch(() => {
+            clientIP = "No disponible";
+          });
+      }
+
+      // Validación del botón Confirmar
       function checkDispatchBtn() {
         const val = document.getElementById("dispatch-code").value.trim();
         document.getElementById("btn-submit-dispatch").disabled =
           val.length === 0;
       }
 
-      // Normalización y parche de corrección óptica
+      // NORMALIZACIÓN INTELIGENTE Y PARCHE ÓPTICO (579 -> 779)
       function sanitizeToken(t) {
         let clean = String(t || "")
           .replace(/[\*\s\-]/g, "")
@@ -568,16 +581,16 @@
         if (clean.length === 13 && clean.startsWith("579")) {
           clean = "7" + clean.substring(1);
         }
-
-        // Por si llega a leer 14 dígitos con un 5 colado adelante (5779...)
+        // Si leyó 14 dígitos con un 5 colado adelante (5779...)
         if (clean.length === 14 && clean.startsWith("5779")) {
           clean = clean.substring(1);
         }
-
         return clean;
       }
 
+      // GESTIÓN DE SESIÓN DE 8 HORAS
       function verifySession() {
+        fetchClientIP();
         const stored = localStorage.getItem("kindo_session_data");
         const stamp = localStorage.getItem("kindo_session_stamp");
 
@@ -647,6 +660,7 @@
         document.getElementById("login-modal").style.display = "flex";
       }
 
+      // CONECTOR JSONP CON AUDITORÍA (IP Y USER AGENT)
       function callAPI(action, params, callback) {
         const cbName =
           "kindo_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
@@ -657,6 +671,10 @@
           delete window[cbName];
           if (script.parentNode) script.parentNode.removeChild(script);
         };
+
+        // Inyección de parámetros de auditoría
+        params.ip = clientIP;
+        params.ua = navigator.userAgent;
 
         let qs = `${GAS_URL}?action=${action}&callback=${cbName}`;
         for (const k in params) {
@@ -696,7 +714,7 @@
         document.getElementById("kpi-alerts").innerText = alertsCount;
       }
 
-      // CONFIRMACIÓN DE DESPACHO
+      // DESPACHO / PICK & PACK (CON FALLBACK FLEXIBLE)
       function submitDispatch() {
         const inputEl = document.getElementById("dispatch-code");
         const rawCode = inputEl.value;
@@ -707,6 +725,7 @@
 
         if (!cleanCode) return;
 
+        // Match exacto o por terminación (excluyendo TOTALES)
         const item = catalog.find((i) => {
           const itemEan = sanitizeToken(i.ean);
           const itemSku = sanitizeToken(i.sku);
@@ -757,7 +776,7 @@
         );
       }
 
-      // ESCÁNER DE CÁMARA CORREGIDO
+      // ESCÁNER DE CÁMARA
       function toggleCameraScanner() {
         const readerDiv = document.getElementById("reader-container");
         const btn = document.getElementById("btn-cam");
@@ -791,17 +810,11 @@
               (decodedText) => {
                 const parsed = sanitizeToken(decodedText);
 
-                // 1. Escribir en el input
                 const inputEl = document.getElementById("dispatch-code");
                 inputEl.value = parsed;
-
-                // 2. Habilitar botón Confirmar
                 checkDispatchBtn();
 
-                // 3. Feedback táctil
                 if (navigator.vibrate) navigator.vibrate(100);
-
-                // 4. Apagar cámara limpiamente dejando el valor en pantalla
                 toggleCameraScanner();
               },
               () => {},
