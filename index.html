@@ -1020,7 +1020,7 @@
 
     <script>
       // CONTROL DE VERSIONES Y CONFIGURACIÓN
-      const HTML_VERSION = "v3.3.0-ui";
+      const HTML_VERSION = "v3.3.1-ui";
       const GAS_URL =
         "https://script.google.com/macros/s/AKfycbxFWAZ00PqdswIasjKV0T_qT7yqUliFD-6EybpXVhslgxthhIiIzcJKU_TMLwYjMcek/exec";
       const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;
@@ -1181,7 +1181,11 @@
               currentUser.nombre;
             document.getElementById("login-modal").style.display = "none";
             err.innerText = "";
-            fetchStock();
+
+            // Pausa de estabilización para evitar colisión de sockets en GAS
+            setTimeout(() => {
+              fetchStock();
+            }, 600);
           } else {
             err.innerText = res.message || "PIN no autorizado.";
           }
