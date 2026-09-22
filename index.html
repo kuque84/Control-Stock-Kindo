@@ -848,17 +848,33 @@
       }
 
       function fetchStock() {
+        // 1. Render inmediato desde caché si existe
+        const cached = localStorage.getItem("kindo_cached_catalog");
+        if (cached && catalog.length === 0) {
+          catalog = JSON.parse(cached);
+          devLog(
+            "CACHE",
+            `Render inmediato desde caché (${catalog.length} SKUs).`,
+          );
+          updateKPIs();
+          renderStockView();
+        }
+
         document.getElementById("kpi-sync").innerText = "🟡";
-        devLog("INVENTORY", "Descargando inventario desde Control_Stock...");
+        devLog("INVENTORY", "Sincronizando inventario con Google Sheets...");
+
         callAPI("getStock", {}, (res) => {
           if (res && res.status === "success") {
             catalog = res.data.filter(
               (i) => i.sku && !i.sku.toUpperCase().includes("TOTAL"),
             );
+            localStorage.setItem(
+              "kindo_cached_catalog",
+              JSON.stringify(catalog),
+            );
             devLog(
               "INVENTORY",
-              `Inventario cargado: ${catalog.length} SKUs disponibles.`,
-              catalog,
+              `Inventario sincronizado: ${catalog.length} SKUs.`,
             );
             document.getElementById("kpi-sync").innerText = "🟢";
             updateKPIs();
