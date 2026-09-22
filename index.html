@@ -600,40 +600,58 @@
       let isCameraActive = false;
       let clientIP = "Detectando...";
 
-      // Obtener IP pública para el log de auditoría
+      // LOGGER PARA DEVTOOLS (F12)
+      function devLog(module, msg, data = null) {
+        const time = new Date().toLocaleTimeString("es-AR", { hour12: false });
+        const tag = `%c[KINDO-OPS ${time}] [${module}]`;
+        const style =
+          "background: #1e1e38; color: #38bdf8; font-weight: bold; padding: 2px 6px; border-radius: 4px;";
+
+        if (data) {
+          console.log(tag, style, msg, data);
+        } else {
+          console.log(tag, style, msg);
+        }
+      }
+
+      // IP Pública del Operador
       function fetchClientIP() {
         fetch("https://api.ipify.org?format=json")
           .then((r) => r.json())
           .then((d) => {
             clientIP = d.ip;
+            devLog("NETWORK", `IP pública detectada: ${clientIP}`);
           })
           .catch(() => {
             clientIP = "No disponible";
+            devLog(
+              "NETWORK",
+              "No se pudo obtener IP pública, usando fallback.",
+            );
           });
       }
 
-      // NORMALIZACIÓN Y PARCHE ÓPTICO (579 -> 779)
+      // Normalizador de códigos
       function sanitizeToken(t) {
         let clean = String(t || "")
           .replace(/[\*\s\-]/g, "")
           .toUpperCase()
           .trim();
-
-        // Si la cámara leyó '579...' en lugar del código argentino '779...' (13 dígitos)
         if (clean.length === 13 && clean.startsWith("579")) {
           clean = "7" + clean.substring(1);
+          devLog("BARCODE", `Parche óptico aplicado (579 -> 779): ${clean}`);
         }
-        // Si leyó 14 dígitos con un 5 o cero colado adelante
         if (
           clean.length === 14 &&
           (clean.startsWith("5779") || clean.startsWith("0779"))
         ) {
           clean = clean.substring(1);
+          devLog("BARCODE", `Prefijo espurio recortado: ${clean}`);
         }
         return clean;
       }
 
-      // Buscar artículo en catálogo excluyendo TOTALES
+      // Búsqueda en catálogo sin colisión de TOTALES
       function findCatalogItem(cleanCode) {
         if (!cleanCode) return null;
         return catalog.find((i) => {
@@ -651,7 +669,6 @@
         });
       }
 
-      // Validación del botón Confirmar y activación del cartel de Bin Location
       function checkDispatchBtn() {
         const inputEl = document.getElementById("dispatch-code");
         const clean = sanitizeToken(inputEl.value);
@@ -672,28 +689,50 @@
             `${item.desc} — Clase ${item.abc} (${item.cat})`;
           binBox.style.display = "block";
           btn.disabled = false;
+          devLog(
+            "PICK-PACK",
+            `Item localizado en rack: ${item.ubicacion}`,
+            item,
+          );
         } else {
           binBox.style.display = "none";
           btn.disabled = true;
         }
       }
 
-      // CONTROL DE SESIÓN (8 HORAS)
+      // GESTIÓN DE SESIÓN
       function verifySession() {
+        devLog("AUTH", "Verificando sesión almacenada...");
         fetchClientIP();
         const stored = localStorage.getItem("kindo_session_data");
         const stamp = localStorage.getItem("kindo_session_stamp");
 
         if (stored && stamp) {
           const elapsed = Date.now() - parseInt(stamp, 10);
+          const remainingHours = (
+            (SESSION_TIMEOUT_MS - elapsed) /
+            (1000 * 60 * 60)
+          ).toFixed(1);
+
           if (elapsed < SESSION_TIMEOUT_MS) {
             currentUser = JSON.parse(stored);
+            devLog(
+              "AUTH",
+              `Sesión activa para ${currentUser.nombre}. Restan ~${remainingHours} hs de turno.`,
+            );
             document.getElementById("user-display").innerText =
               currentUser.nombre;
             document.getElementById("login-modal").style.display = "none";
             fetchStock();
             return;
+          } else {
+            devLog(
+              "AUTH",
+              "El turno de 8 horas ha expirado. Solicitando nuevo PIN.",
+            );
           }
+        } else {
+          devLog("AUTH", "No hay sesión previa en este navegador.");
         }
 
         localStorage.removeItem("kindo_session_data");
@@ -704,10 +743,17 @@
       function executeLogin() {
         const pin = document.getElementById("login-pin").value.trim();
         const err = document.getElementById("login-error");
-        if (!pin) return;
+        if (!pin) {
+          err.innerText = "Ingresá un PIN.";
+          return;
+        }
 
+        devLog("AUTH", `Intentando login con PIN de ${pin.length} dígitos...`);
         err.innerText = "⏳ Verificando credenciales...";
+
         callAPI("login", { pin: pin }, (res) => {
+          devLog("AUTH", "Respuesta recibida del backend:", res);
+
           if (res && res.status === "success") {
             currentUser = res.user;
             localStorage.setItem(
@@ -719,14 +765,23 @@
               currentUser.nombre;
             document.getElementById("login-modal").style.display = "none";
             err.innerText = "";
+            devLog(
+              "AUTH",
+              `✓ Login exitoso. Usuario: ${currentUser.nombre} (Rol: ${currentUser.rol})`,
+            );
             fetchStock();
           } else {
             err.innerText = res.message || "PIN no autorizado.";
+            devLog(
+              "AUTH",
+              `❌ Login fallido: ${res.message || "Error desconocido"}`,
+            );
           }
         });
       }
 
       function forceLogout() {
+        devLog("AUTH", "Cerrando sesión manual...");
         localStorage.removeItem("kindo_session_data");
         localStorage.removeItem("kindo_session_stamp");
         currentUser = null;
@@ -750,20 +805,29 @@
         document.getElementById("login-modal").style.display = "flex";
       }
 
-      // CONECTOR JSONP CON AUDITORÍA
+      // CONECTOR JSONP ROBUSTO CON LOGS
       function callAPI(action, params, callback) {
         const cbName =
           "kindo_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
         const script = document.createElement("script");
+        const startTime = performance.now();
+
+        params.ip = clientIP;
+        params.ua = navigator.userAgent;
+
+        devLog("API", `Disparando acción: [${action}]`, params);
 
         window[cbName] = function (data) {
+          const duration = Math.round(performance.now() - startTime);
+          devLog(
+            "API",
+            `Respuesta recibida para [${action}] en ${duration}ms:`,
+            data,
+          );
           callback(data);
           delete window[cbName];
           if (script.parentNode) script.parentNode.removeChild(script);
         };
-
-        params.ip = clientIP;
-        params.ua = navigator.userAgent;
 
         let qs = `${GAS_URL}?action=${action}&callback=${cbName}`;
         for (const k in params) {
@@ -771,7 +835,12 @@
         }
 
         script.src = qs;
-        script.onerror = () => {
+        script.onerror = (e) => {
+          devLog(
+            "API",
+            `❌ Error crítico de red o CORS/JSONP al llamar a [${action}]`,
+            e,
+          );
           document.getElementById("kpi-sync").innerText = "🔴";
           alert("Error de conexión con el backend de Google Sheets.");
         };
@@ -780,10 +849,16 @@
 
       function fetchStock() {
         document.getElementById("kpi-sync").innerText = "🟡";
+        devLog("INVENTORY", "Descargando inventario desde Control_Stock...");
         callAPI("getStock", {}, (res) => {
           if (res && res.status === "success") {
             catalog = res.data.filter(
               (i) => i.sku && !i.sku.toUpperCase().includes("TOTAL"),
+            );
+            devLog(
+              "INVENTORY",
+              `Inventario cargado: ${catalog.length} SKUs disponibles.`,
+              catalog,
             );
             document.getElementById("kpi-sync").innerText = "🟢";
             updateKPIs();
@@ -803,9 +878,12 @@
 
         document.getElementById("kpi-units").innerText = totalUnits;
         document.getElementById("kpi-alerts").innerText = alertsCount;
+        devLog(
+          "KPIS",
+          `KPIs actualizados: ${totalUnits} unidades físicas, ${alertsCount} en alerta.`,
+        );
       }
 
-      // PICK & PACK (DESPACHO)
       function submitDispatch() {
         const inputEl = document.getElementById("dispatch-code");
         const cleanCode = sanitizeToken(inputEl.value);
@@ -822,10 +900,10 @@
               cleanCode +
               "]\n\nVerificá que exista en la planilla.",
           );
+          devLog("PICK-PACK", `Código desconocido: ${cleanCode}`);
           return;
         }
 
-        // Optimistic update
         item.stockActual -= cant;
         if (item.stockActual <= 0) item.estado = "QUIEBRE";
         else if (item.stockActual <= item.ptoPedido) item.estado = "REORDEN";
@@ -845,6 +923,10 @@
         checkDispatchBtn();
         inputEl.focus();
 
+        devLog(
+          "PICK-PACK",
+          `Confirmando despacho de ${cant}u de ${item.sku} vía ${canal}`,
+        );
         callAPI(
           "dispatch",
           {
@@ -854,12 +936,17 @@
             author: currentUser.nombre,
           },
           (res) => {
-            if (!res || res.status !== "success") fetchStock();
+            if (!res || res.status !== "success") {
+              devLog(
+                "PICK-PACK",
+                "Error en sincronización de despacho, recargando catálogo...",
+              );
+              fetchStock();
+            }
           },
         );
       }
 
-      // ESCÁNER DE CÁMARA
       function toggleCameraScanner() {
         const readerDiv = document.getElementById("reader-container");
         const btn = document.getElementById("btn-cam");
@@ -871,6 +958,7 @@
               readerDiv.style.display = "none";
               btn.innerText = "📷 Activar Escáner de Cámara";
               isCameraActive = false;
+              devLog("CAMERA", "Cámara apagada.");
             })
             .catch(() => {});
         } else {
@@ -891,6 +979,7 @@
               { facingMode: "environment" },
               { fps: 10, qrbox: { width: 250, height: 120 } },
               (decodedText) => {
+                devLog("CAMERA", `Frame decodificado: "${decodedText}"`);
                 const parsed = sanitizeToken(decodedText);
                 const inputEl = document.getElementById("dispatch-code");
                 inputEl.value = parsed;
@@ -903,8 +992,10 @@
             )
             .then(() => {
               isCameraActive = true;
+              devLog("CAMERA", "Cámara encendida y transmitiendo.");
             })
-            .catch(() => {
+            .catch((err) => {
+              devLog("CAMERA", "Fallo al iniciar cámara:", err);
               alert("No se pudo acceder a la cámara.");
               readerDiv.style.display = "none";
               btn.innerText = "📷 Activar Escáner de Cámara";
@@ -925,6 +1016,10 @@
           return;
         }
 
+        devLog(
+          "RECEPTION",
+          `Ingresando ${cant}u de ${cleanCode} desde proveedor ${prov}`,
+        );
         callAPI(
           "receive",
           {
@@ -949,7 +1044,6 @@
         );
       }
 
-      // LISTADO DE STOCK CON UBICACIÓN VISIBLE
       function renderStockView() {
         const q = sanitizeToken(document.getElementById("stock-search").value);
         const container = document.getElementById("stock-container");
