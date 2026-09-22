@@ -826,7 +826,7 @@
 
     <script>
       // CONTROL DE VERSIONES Y CONFIGURACIÓN
-      const HTML_VERSION = "v3.2.0-ui";
+      const HTML_VERSION = "v3.2.1-ui";
       const GAS_URL =
         "https://script.google.com/macros/s/AKfycbxFWAZ00PqdswIasjKV0T_qT7yqUliFD-6EybpXVhslgxthhIiIzcJKU_TMLwYjMcek/exec";
       const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;
@@ -1174,13 +1174,10 @@
             author: currentUser.nombre,
           },
           (res) => {
-            if (res && res.status === "success") {
-              fetchStock();
+            if (!res || res.status !== "success") {
+              devLog("REVERSE", "Error al asentar en Google Sheet:", res);
             } else {
-              alert(
-                "Error: " +
-                  (res.message || "No se pudo asentar la devolución."),
-              );
+              devLog("REVERSE", "✓ Asentado con éxito en el servidor.");
             }
           },
         );
