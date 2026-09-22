@@ -28,6 +28,7 @@
         --success: #10b981;
         --warning: #f59e0b;
         --danger: #f43f5e;
+        --purple: #a855f7;
         --text: #f8fafc;
         --text-muted: #94a3b8;
       }
@@ -43,7 +44,7 @@
         background: var(--bg);
         color: var(--text);
         min-height: 100vh;
-        padding-bottom: 90px;
+        padding-bottom: 110px;
       }
 
       /* Modal Login */
@@ -228,8 +229,50 @@
         border: 1px solid var(--surface-border);
         margin-bottom: 12px;
       }
+      .btn-reverse {
+        background: var(--purple);
+        color: white;
+      }
+      .btn-reverse:active:not(:disabled) {
+        transform: scale(0.98);
+        opacity: 0.9;
+      }
 
-      /* Caja de Ubicación en Depósito (Bin Location) */
+      /* Radio Cards para Condición de Logística Inversa */
+      .condition-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .condition-card {
+        background: #090d16;
+        border: 2px solid var(--surface-border);
+        border-radius: 10px;
+        padding: 12px;
+        text-align: center;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .condition-card.active-apto {
+        border-color: var(--success);
+        background: rgba(16, 185, 129, 0.1);
+      }
+      .condition-card.active-no-apto {
+        border-color: var(--danger);
+        background: rgba(244, 63, 94, 0.1);
+      }
+      .condition-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-bottom: 2px;
+      }
+      .condition-desc {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      /* Caja de Ubicación en Depósito */
       #bin-location-box {
         display: none;
         background: rgba(30, 41, 59, 0.7);
@@ -255,7 +298,6 @@
         color: var(--text-muted);
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
       }
       .bin-coord {
         font-family: "JetBrains Mono", monospace;
@@ -335,15 +377,33 @@
         align-items: center;
         justify-content: center;
         color: var(--text-muted);
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         font-weight: 700;
         background: none;
         border: none;
         cursor: pointer;
         gap: 4px;
+        text-transform: uppercase;
       }
       .tab-item.active {
         color: var(--accent);
+      }
+
+      /* Footer Discreto con Versiones */
+      .version-footer {
+        text-align: center;
+        padding: 10px;
+        font-size: 0.7rem;
+        color: #475569;
+        font-family: "JetBrains Mono", monospace;
+        border-top: 1px solid #131b2e;
+        margin-top: 20px;
+      }
+      .version-tag {
+        background: #131b2e;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid #232f48;
       }
     </style>
   </head>
@@ -429,7 +489,7 @@
           <button
             class="btn btn-camera"
             id="btn-cam"
-            onclick="toggleCameraScanner()"
+            onclick="toggleCameraScanner('dispatch-code')"
           >
             📷 Activar Escáner de Cámara
           </button>
@@ -447,7 +507,7 @@
             onkeydown="if (event.key === 'Enter') submitDispatch();"
           />
 
-          <!-- TARJETA DINÁMICA DE UBICACIÓN FÍSICA (LAYOUT EN U) -->
+          <!-- TARJETA DINÁMICA DE UBICACIÓN FÍSICA -->
           <div id="bin-location-box">
             <div class="bin-title">📍 Ubicación en Depósito (Layout en U)</div>
             <div id="bin-location-txt" class="bin-coord">PAS-01-EST-A1</div>
@@ -502,7 +562,129 @@
         </div>
       </section>
 
-      <!-- PESTAÑA 2: INVENTARIO & REORDEN -->
+      <!-- PESTAÑA 2: LOGÍSTICA INVERSA (DEVOLUCIONES Y CAMBIOS) -->
+      <section id="view-reverse" style="display: none">
+        <div class="card" style="border-top: 4px solid var(--purple)">
+          <h3 style="font-size: 1rem; margin-bottom: 4px">
+            Logística Inversa (Cambios y Retornos)
+          </h3>
+          <p
+            style="
+              font-size: 0.8rem;
+              color: var(--text-muted);
+              margin-bottom: 14px;
+            "
+          >
+            Recepción y triage de devoluciones vía Andreani o retiro.
+          </p>
+
+          <button
+            class="btn btn-camera"
+            style="color: var(--purple)"
+            onclick="toggleCameraScanner('reverse-code')"
+          >
+            📷 Escanear Prenda Retornada
+          </button>
+
+          <label class="field-label">Código EAN-13 o SKU Devuelto</label>
+          <input
+            type="text"
+            id="reverse-code"
+            class="input-control"
+            placeholder="Escanear o tipear artículo..."
+            oninput="checkReverseBtn()"
+          />
+
+          <label class="field-label">Clasificación / Triage de la Prenda</label>
+          <div class="condition-grid">
+            <div
+              class="condition-card active-apto"
+              id="opt-apto"
+              onclick="setCondition('APTO')"
+            >
+              <div class="condition-title" style="color: var(--success)">
+                ✓ APTO PARA VENTA
+              </div>
+              <div class="condition-desc">Reingresa al stock disponible</div>
+            </div>
+            <div
+              class="condition-card"
+              id="opt-no-apto"
+              onclick="setCondition('NO_APTO')"
+            >
+              <div class="condition-title" style="color: var(--danger)">
+                ⚠ NO APTO (FALLADO)
+              </div>
+              <div class="condition-desc">Pasa a Segunda / Cuarentena</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+            <div>
+              <label class="field-label">Motivo de Retorno</label>
+              <select id="reverse-motivo" class="input-control">
+                <option value="Cambio de Talle">Cambio de Talle</option>
+                <option value="Disconformidad con Calce">
+                  Disconformidad / Devolución
+                </option>
+                <option value="Falla de Confección">Falla de Confección</option>
+                <option value="Falla de Estampado">Falla de Estampado</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Transporte</label>
+              <select id="reverse-transporte" class="input-control">
+                <option value="Andreani Retorno">Andreani Retorno</option>
+                <option value="Entrega en Depósito">Entrega en Depósito</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px">
+            <div>
+              <label class="field-label">Resolución</label>
+              <input
+                type="text"
+                id="reverse-obs"
+                class="input-control"
+                value="Recepción conforme"
+                placeholder="Detalle..."
+              />
+            </div>
+            <div>
+              <label class="field-label">Cantidad</label>
+              <input
+                type="number"
+                id="reverse-cant"
+                class="input-control"
+                value="1"
+                min="1"
+              />
+            </div>
+          </div>
+
+          <button
+            class="btn btn-reverse"
+            id="btn-submit-reverse"
+            disabled
+            onclick="submitReverseLogistics()"
+          >
+            Procesar Devolución
+          </button>
+        </div>
+
+        <div class="card">
+          <label class="field-label">Último Retorno Procesado</label>
+          <div
+            id="reverse-feedback"
+            style="font-size: 0.85rem; color: var(--text-muted)"
+          >
+            Sin retornos procesados en esta sesión.
+          </div>
+        </div>
+      </section>
+
+      <!-- PESTAÑA 3: INVENTARIO & REORDEN -->
       <section id="view-stock" style="display: none">
         <input
           type="text"
@@ -514,7 +696,7 @@
         <div id="stock-container">Cargando catálogo...</div>
       </section>
 
-      <!-- PESTAÑA 3: INGRESO DE PROVEEDORES -->
+      <!-- PESTAÑA 4: INGRESO DE PROVEEDORES -->
       <section id="view-reception" style="display: none">
         <div class="card">
           <h3 style="font-size: 1rem; margin-bottom: 4px">
@@ -570,15 +752,31 @@
           </button>
         </div>
       </section>
+
+      <!-- FOOTER DISCRETO CON CONTROL DE VERSIONES -->
+      <footer class="version-footer">
+        <span
+          >KINDO OPS // CLIENT:
+          <b class="version-tag" id="ver-client">v3.2.0-ui</b></span
+        >
+        &nbsp;|&nbsp;
+        <span
+          >BACKEND:
+          <b class="version-tag" id="ver-backend">Conectando...</b></span
+        >
+      </footer>
     </main>
 
-    <!-- BARRA NAVEGACIÓN INFERIOR -->
+    <!-- BARRA NAVEGACIÓN INFERIOR (4 PESTAÑAS) -->
     <nav class="nav-tabs">
       <button class="tab-item active" onclick="switchNav('dispatch', this)">
         <span>📦</span> Despacho
       </button>
+      <button class="tab-item" onclick="switchNav('reverse', this)">
+        <span>🔄</span> Retornos
+      </button>
       <button class="tab-item" onclick="switchNav('stock', this)">
-        <span>📋</span> Stock & ROP
+        <span>📋</span> Stock
       </button>
       <button class="tab-item" onclick="switchNav('reception', this)">
         <span>📥</span> Recepción
@@ -589,7 +787,8 @@
     </nav>
 
     <script>
-      // ENDPOINT OFICIAL APPS SCRIPT
+      // CONTROL DE VERSIONES Y CONFIGURACIÓN
+      const HTML_VERSION = "v3.2.0-ui";
       const GAS_URL =
         "https://script.google.com/macros/s/AKfycbxFWAZ00PqdswIasjKV0T_qT7yqUliFD-6EybpXVhslgxthhIiIzcJKU_TMLwYjMcek/exec";
       const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;
@@ -599,66 +798,51 @@
       let html5QrCode = null;
       let isCameraActive = false;
       let clientIP = "Detectando...";
+      let selectedCondition = "APTO";
+      let activeCameraTarget = "dispatch-code";
 
-      // LOGGER PARA DEVTOOLS (F12)
       function devLog(module, msg, data = null) {
         const time = new Date().toLocaleTimeString("es-AR", { hour12: false });
         const tag = `%c[KINDO-OPS ${time}] [${module}]`;
         const style =
           "background: #1e1e38; color: #38bdf8; font-weight: bold; padding: 2px 6px; border-radius: 4px;";
-
-        if (data) {
-          console.log(tag, style, msg, data);
-        } else {
-          console.log(tag, style, msg);
-        }
+        if (data) console.log(tag, style, msg, data);
+        else console.log(tag, style, msg);
       }
 
-      // IP Pública del Operador
       function fetchClientIP() {
         fetch("https://api.ipify.org?format=json")
           .then((r) => r.json())
           .then((d) => {
             clientIP = d.ip;
-            devLog("NETWORK", `IP pública detectada: ${clientIP}`);
+            devLog("NETWORK", `IP detectada: ${clientIP}`);
           })
           .catch(() => {
             clientIP = "No disponible";
-            devLog(
-              "NETWORK",
-              "No se pudo obtener IP pública, usando fallback.",
-            );
           });
       }
 
-      // Normalizador de códigos
       function sanitizeToken(t) {
         let clean = String(t || "")
           .replace(/[\*\s\-]/g, "")
           .toUpperCase()
           .trim();
-        if (clean.length === 13 && clean.startsWith("579")) {
+        if (clean.length === 13 && clean.startsWith("579"))
           clean = "7" + clean.substring(1);
-          devLog("BARCODE", `Parche óptico aplicado (579 -> 779): ${clean}`);
-        }
         if (
           clean.length === 14 &&
           (clean.startsWith("5779") || clean.startsWith("0779"))
-        ) {
+        )
           clean = clean.substring(1);
-          devLog("BARCODE", `Prefijo espurio recortado: ${clean}`);
-        }
         return clean;
       }
 
-      // Búsqueda en catálogo sin colisión de TOTALES
       function findCatalogItem(cleanCode) {
         if (!cleanCode) return null;
         return catalog.find((i) => {
           if (!i.sku || i.sku.toUpperCase().includes("TOTAL")) return false;
           const itemEan = sanitizeToken(i.ean);
           const itemSku = sanitizeToken(i.sku);
-
           if (itemEan === cleanCode || itemSku === cleanCode) return true;
           if (
             itemEan.length >= 8 &&
@@ -689,50 +873,55 @@
             `${item.desc} — Clase ${item.abc} (${item.cat})`;
           binBox.style.display = "block";
           btn.disabled = false;
-          devLog(
-            "PICK-PACK",
-            `Item localizado en rack: ${item.ubicacion}`,
-            item,
-          );
         } else {
           binBox.style.display = "none";
           btn.disabled = true;
         }
       }
 
-      // GESTIÓN DE SESIÓN
+      // MANEJO DE CONDICIÓN EN LOGÍSTICA INVERSA
+      function setCondition(cond) {
+        selectedCondition = cond;
+        const optApto = document.getElementById("opt-apto");
+        const optNoApto = document.getElementById("opt-no-apto");
+
+        if (cond === "APTO") {
+          optApto.className = "condition-card active-apto";
+          optNoApto.className = "condition-card";
+        } else {
+          optApto.className = "condition-card";
+          optNoApto.className = "condition-card active-no-apto";
+        }
+        devLog("REVERSE", `Condición establecida: ${cond}`);
+      }
+
+      function checkReverseBtn() {
+        const clean = sanitizeToken(
+          document.getElementById("reverse-code").value,
+        );
+        const btn = document.getElementById("btn-submit-reverse");
+        const item = findCatalogItem(clean);
+        btn.disabled = !clean || !item;
+      }
+
+      // SESIÓN Y LOGIN
       function verifySession() {
-        devLog("AUTH", "Verificando sesión almacenada...");
+        document.getElementById("ver-client").innerText = HTML_VERSION;
         fetchClientIP();
+
         const stored = localStorage.getItem("kindo_session_data");
         const stamp = localStorage.getItem("kindo_session_stamp");
 
         if (stored && stamp) {
           const elapsed = Date.now() - parseInt(stamp, 10);
-          const remainingHours = (
-            (SESSION_TIMEOUT_MS - elapsed) /
-            (1000 * 60 * 60)
-          ).toFixed(1);
-
           if (elapsed < SESSION_TIMEOUT_MS) {
             currentUser = JSON.parse(stored);
-            devLog(
-              "AUTH",
-              `Sesión activa para ${currentUser.nombre}. Restan ~${remainingHours} hs de turno.`,
-            );
             document.getElementById("user-display").innerText =
               currentUser.nombre;
             document.getElementById("login-modal").style.display = "none";
             fetchStock();
             return;
-          } else {
-            devLog(
-              "AUTH",
-              "El turno de 8 horas ha expirado. Solicitando nuevo PIN.",
-            );
           }
-        } else {
-          devLog("AUTH", "No hay sesión previa en este navegador.");
         }
 
         localStorage.removeItem("kindo_session_data");
@@ -743,19 +932,14 @@
       function executeLogin() {
         const pin = document.getElementById("login-pin").value.trim();
         const err = document.getElementById("login-error");
-        if (!pin) {
-          err.innerText = "Ingresá un PIN.";
-          return;
-        }
+        if (!pin) return;
 
-        devLog("AUTH", `Intentando login con PIN de ${pin.length} dígitos...`);
         err.innerText = "⏳ Verificando credenciales...";
-
         callAPI("login", { pin: pin }, (res) => {
-          devLog("AUTH", "Respuesta recibida del backend:", res);
-
           if (res && res.status === "success") {
             currentUser = res.user;
+            if (res.version)
+              document.getElementById("ver-backend").innerText = res.version;
             localStorage.setItem(
               "kindo_session_data",
               JSON.stringify(currentUser),
@@ -765,47 +949,32 @@
               currentUser.nombre;
             document.getElementById("login-modal").style.display = "none";
             err.innerText = "";
-            devLog(
-              "AUTH",
-              `✓ Login exitoso. Usuario: ${currentUser.nombre} (Rol: ${currentUser.rol})`,
-            );
             fetchStock();
           } else {
             err.innerText = res.message || "PIN no autorizado.";
-            devLog(
-              "AUTH",
-              `❌ Login fallido: ${res.message || "Error desconocido"}`,
-            );
           }
         });
       }
 
       function forceLogout() {
-        devLog("AUTH", "Cerrando sesión manual...");
         localStorage.removeItem("kindo_session_data");
         localStorage.removeItem("kindo_session_stamp");
         currentUser = null;
-
         if (html5QrCode && isCameraActive) {
           html5QrCode
             .stop()
             .then(() => {
               isCameraActive = false;
-              document.getElementById("reader-container").style.display =
-                "none";
-              document.getElementById("btn-cam").innerText =
-                "📷 Activar Escáner de Cámara";
             })
             .catch(() => {});
         }
-
         document.getElementById("user-display").innerText = "Turno Inactivo";
         document.getElementById("login-pin").value = "";
         document.getElementById("login-error").innerText = "";
         document.getElementById("login-modal").style.display = "flex";
       }
 
-      // CONECTOR JSONP ROBUSTO CON LOGS
+      // CONECTOR JSONP
       function callAPI(action, params, callback) {
         const cbName =
           "kindo_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
@@ -815,15 +984,12 @@
         params.ip = clientIP;
         params.ua = navigator.userAgent;
 
-        devLog("API", `Disparando acción: [${action}]`, params);
-
         window[cbName] = function (data) {
           const duration = Math.round(performance.now() - startTime);
-          devLog(
-            "API",
-            `Respuesta recibida para [${action}] en ${duration}ms:`,
-            data,
-          );
+          devLog("API", `Respuesta para [${action}] (${duration}ms):`, data);
+          if (data && data.version) {
+            document.getElementById("ver-backend").innerText = data.version;
+          }
           callback(data);
           delete window[cbName];
           if (script.parentNode) script.parentNode.removeChild(script);
@@ -836,33 +1002,22 @@
 
         script.src = qs;
         script.onerror = (e) => {
-          devLog(
-            "API",
-            `❌ Error crítico de red o CORS/JSONP al llamar a [${action}]`,
-            e,
-          );
+          devLog("API", `Error en [${action}]`, e);
           document.getElementById("kpi-sync").innerText = "🔴";
-          alert("Error de conexión con el backend de Google Sheets.");
         };
         document.body.appendChild(script);
       }
 
       function fetchStock() {
-        // 1. Render inmediato desde caché si existe
+        // Render instantáneo desde caché
         const cached = localStorage.getItem("kindo_cached_catalog");
         if (cached && catalog.length === 0) {
           catalog = JSON.parse(cached);
-          devLog(
-            "CACHE",
-            `Render inmediato desde caché (${catalog.length} SKUs).`,
-          );
           updateKPIs();
           renderStockView();
         }
 
         document.getElementById("kpi-sync").innerText = "🟡";
-        devLog("INVENTORY", "Sincronizando inventario con Google Sheets...");
-
         callAPI("getStock", {}, (res) => {
           if (res && res.status === "success") {
             catalog = res.data.filter(
@@ -871,10 +1026,6 @@
             localStorage.setItem(
               "kindo_cached_catalog",
               JSON.stringify(catalog),
-            );
-            devLog(
-              "INVENTORY",
-              `Inventario sincronizado: ${catalog.length} SKUs.`,
             );
             document.getElementById("kpi-sync").innerText = "🟢";
             updateKPIs();
@@ -891,15 +1042,11 @@
         const alertsCount = catalog.filter(
           (item) => item.estado !== "OK",
         ).length;
-
         document.getElementById("kpi-units").innerText = totalUnits;
         document.getElementById("kpi-alerts").innerText = alertsCount;
-        devLog(
-          "KPIS",
-          `KPIs actualizados: ${totalUnits} unidades físicas, ${alertsCount} en alerta.`,
-        );
       }
 
+      // ACCIÓN: PICK & PACK
       function submitDispatch() {
         const inputEl = document.getElementById("dispatch-code");
         const cleanCode = sanitizeToken(inputEl.value);
@@ -908,17 +1055,8 @@
           parseInt(document.getElementById("dispatch-cant").value, 10) || 1;
 
         if (!cleanCode) return;
-
         const item = findCatalogItem(cleanCode);
-        if (!item) {
-          alert(
-            "❌ No se encontró ningún producto para el código:\n[" +
-              cleanCode +
-              "]\n\nVerificá que exista en la planilla.",
-          );
-          devLog("PICK-PACK", `Código desconocido: ${cleanCode}`);
-          return;
-        }
+        if (!item) return;
 
         item.stockActual -= cant;
         if (item.stockActual <= 0) item.estado = "QUIEBRE";
@@ -939,10 +1077,6 @@
         checkDispatchBtn();
         inputEl.focus();
 
-        devLog(
-          "PICK-PACK",
-          `Confirmando despacho de ${cant}u de ${item.sku} vía ${canal}`,
-        );
         callAPI(
           "dispatch",
           {
@@ -952,18 +1086,81 @@
             author: currentUser.nombre,
           },
           (res) => {
-            if (!res || res.status !== "success") {
-              devLog(
-                "PICK-PACK",
-                "Error en sincronización de despacho, recargando catálogo...",
-              );
+            if (!res || res.status !== "success") fetchStock();
+          },
+        );
+      }
+
+      // ACCIÓN: LOGÍSTICA INVERSA
+      function submitReverseLogistics() {
+        const cleanCode = sanitizeToken(
+          document.getElementById("reverse-code").value,
+        );
+        const cant =
+          parseInt(document.getElementById("reverse-cant").value, 10) || 1;
+        const motivo = document.getElementById("reverse-motivo").value;
+        const transporte = document.getElementById("reverse-transporte").value;
+
+        if (!cleanCode) return;
+        const item = findCatalogItem(cleanCode);
+        if (!item) return;
+
+        // Si es APTO, incrementa el stock disponible localmente
+        if (selectedCondition === "APTO") {
+          item.stockActual += cant;
+          if (item.stockActual > item.ptoPedido) item.estado = "OK";
+          updateKPIs();
+          renderStockView();
+        }
+
+        const logBox = document.getElementById("reverse-feedback");
+        const time = new Date().toLocaleTimeString("es-AR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const color =
+          selectedCondition === "APTO" ? "var(--success)" : "var(--danger)";
+        const label =
+          selectedCondition === "APTO"
+            ? "Reingresado a Stock Comercial"
+            : "Derivado a Merma / Segunda";
+
+        logBox.innerHTML = `<span style="color: ${color}; font-weight:700;">✓ [${time}]</span> Retorno de ${cant}u de <b>${item.desc}</b>: <b>${label}</b> (${motivo})`;
+
+        document.getElementById("reverse-code").value = "";
+        checkReverseBtn();
+
+        devLog(
+          "REVERSE",
+          `Procesando retorno: ${cant}u de ${item.sku} en estado ${selectedCondition}`,
+        );
+        callAPI(
+          "reverseLogistics",
+          {
+            code: item.sku,
+            cant: cant,
+            condicion: selectedCondition,
+            motivo: motivo,
+            transporte: transporte,
+            author: currentUser.nombre,
+          },
+          (res) => {
+            if (res && res.status === "success") {
               fetchStock();
+            } else {
+              alert(
+                "Error: " +
+                  (res.message || "No se pudo asentar la devolución."),
+              );
             }
           },
         );
       }
 
-      function toggleCameraScanner() {
+      // ESCÁNER DE CÁMARA MULTIPROPÓSITO
+      function toggleCameraScanner(targetInputId = "dispatch-code") {
+        activeCameraTarget = targetInputId;
         const readerDiv = document.getElementById("reader-container");
         const btn = document.getElementById("btn-cam");
 
@@ -972,14 +1169,13 @@
             .stop()
             .then(() => {
               readerDiv.style.display = "none";
-              btn.innerText = "📷 Activar Escáner de Cámara";
+              if (btn) btn.innerText = "📷 Activar Escáner de Cámara";
               isCameraActive = false;
-              devLog("CAMERA", "Cámara apagada.");
             })
             .catch(() => {});
         } else {
           readerDiv.style.display = "block";
-          btn.innerText = "⏹ Apagar Cámara";
+          if (btn) btn.innerText = "⏹ Apagar Cámara";
 
           const formatsToSupport = [
             Html5QrcodeSupportedFormats.CODE_39,
@@ -995,34 +1191,34 @@
               { facingMode: "environment" },
               { fps: 10, qrbox: { width: 250, height: 120 } },
               (decodedText) => {
-                devLog("CAMERA", `Frame decodificado: "${decodedText}"`);
                 const parsed = sanitizeToken(decodedText);
-                const inputEl = document.getElementById("dispatch-code");
-                inputEl.value = parsed;
-                checkDispatchBtn();
-
+                const inputEl = document.getElementById(activeCameraTarget);
+                if (inputEl) {
+                  inputEl.value = parsed;
+                  if (activeCameraTarget === "dispatch-code")
+                    checkDispatchBtn();
+                  if (activeCameraTarget === "reverse-code") checkReverseBtn();
+                }
                 if (navigator.vibrate) navigator.vibrate(100);
-                toggleCameraScanner();
+                toggleCameraScanner(activeCameraTarget);
               },
               () => {},
             )
             .then(() => {
               isCameraActive = true;
-              devLog("CAMERA", "Cámara encendida y transmitiendo.");
             })
-            .catch((err) => {
-              devLog("CAMERA", "Fallo al iniciar cámara:", err);
+            .catch(() => {
               alert("No se pudo acceder a la cámara.");
               readerDiv.style.display = "none";
-              btn.innerText = "📷 Activar Escáner de Cámara";
               isCameraActive = false;
             });
         }
       }
 
       function submitReception() {
-        const rawCode = document.getElementById("rec-code").value;
-        const cleanCode = sanitizeToken(rawCode);
+        const cleanCode = sanitizeToken(
+          document.getElementById("rec-code").value,
+        );
         const prov = document.getElementById("rec-prov").value;
         const cant =
           parseInt(document.getElementById("rec-cant").value, 10) || 0;
@@ -1032,10 +1228,6 @@
           return;
         }
 
-        devLog(
-          "RECEPTION",
-          `Ingresando ${cant}u de ${cleanCode} desde proveedor ${prov}`,
-        );
         callAPI(
           "receive",
           {
@@ -1050,11 +1242,7 @@
               document.getElementById("rec-code").value = "";
               document.getElementById("rec-cant").value = "";
               fetchStock();
-              switchNav("stock", document.querySelectorAll(".tab-item")[1]);
-            } else {
-              alert(
-                "Error: " + (res.message || "No se pudo registrar el ingreso."),
-              );
+              switchNav("stock", document.querySelectorAll(".tab-item")[2]);
             }
           },
         );
@@ -1116,6 +1304,8 @@
       function switchNav(view, btn) {
         document.getElementById("view-dispatch").style.display =
           view === "dispatch" ? "block" : "none";
+        document.getElementById("view-reverse").style.display =
+          view === "reverse" ? "block" : "none";
         document.getElementById("view-stock").style.display =
           view === "stock" ? "block" : "none";
         document.getElementById("view-reception").style.display =
