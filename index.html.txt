@@ -10,12 +10,14 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap"
       rel="stylesheet"
     />
 
     <!-- Lector de Código de Barras por Cámara -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- Generador de Códigos QR para Rótulos de Envío -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <style>
       :root {
@@ -28,6 +30,7 @@
         --success: #10b981;
         --warning: #f59e0b;
         --danger: #f43f5e;
+        --purple: #a855f7;
         --text: #f8fafc;
         --text-muted: #94a3b8;
       }
@@ -43,7 +46,7 @@
         background: var(--bg);
         color: var(--text);
         min-height: 100vh;
-        padding-bottom: 90px;
+        padding-bottom: 110px;
       }
 
       /* Modal Login */
@@ -228,14 +231,102 @@
         border: 1px solid var(--surface-border);
         margin-bottom: 12px;
       }
+      .btn-reverse {
+        background: var(--purple);
+        color: white;
+      }
+      .btn-reverse:active:not(:disabled) {
+        transform: scale(0.98);
+        opacity: 0.9;
+      }
 
-      /* Contenedor Lector Cámara */
-      #reader-container {
-        display: none;
-        border-radius: 12px;
-        overflow: hidden;
+      /* Radio Cards para Condición de Logística Inversa */
+      .condition-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
         margin-bottom: 14px;
+      }
+      .condition-card {
+        background: #090d16;
+        border: 2px solid var(--surface-border);
+        border-radius: 10px;
+        padding: 12px;
+        text-align: center;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .condition-card.active-apto {
+        border-color: var(--success);
+        background: rgba(16, 185, 129, 0.1);
+      }
+      .condition-card.active-no-apto {
+        border-color: var(--danger);
+        background: rgba(244, 63, 94, 0.1);
+      }
+      .condition-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-bottom: 2px;
+      }
+      .condition-desc {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      /* Caja de Ubicación en Depósito */
+      #bin-location-box {
+        display: none;
+        background: rgba(30, 41, 59, 0.7);
         border: 2px solid var(--accent);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 14px;
+        text-align: center;
+        animation: fadeIn 0.25s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .bin-title {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .bin-coord {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: var(--accent);
+        margin: 4px 0;
+      }
+      .bin-details {
+        font-size: 0.85rem;
+        color: #cbd5e1;
+      }
+
+      /* Contenedor Lector Cámara Global */
+      #global-camera-card {
+        display: none;
+        background: var(--surface);
+        border: 2px solid var(--accent);
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 16px;
+        text-align: center;
+      }
+      #reader {
+        width: 100%;
+        border-radius: 10px;
+        overflow: hidden;
       }
 
       /* Cards Inventario */
@@ -295,15 +386,158 @@
         align-items: center;
         justify-content: center;
         color: var(--text-muted);
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         font-weight: 700;
         background: none;
         border: none;
         cursor: pointer;
         gap: 4px;
+        text-transform: uppercase;
       }
       .tab-item.active {
         color: var(--accent);
+      }
+
+      /* Footer Discreto con Versiones */
+      .version-footer {
+        text-align: center;
+        padding: 12px;
+        font-size: 0.7rem;
+        color: #475569;
+        font-family: "JetBrains Mono", monospace;
+        border-top: 1px solid #131b2e;
+        margin-top: 24px;
+      }
+      .version-tag {
+        background: #131b2e;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid #232f48;
+      }
+
+      /* MODAL DE RÓTULO DE ENVÍO / PACKING (PRIORIDAD 4) */
+      #label-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(9, 13, 22, 0.92);
+        backdrop-filter: blur(8px);
+        z-index: 9998;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      .label-box {
+        background: white;
+        color: #0f172a;
+        width: 100%;
+        max-width: 360px;
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+        font-family: "Plus Jakarta Sans", sans-serif;
+      }
+      .shipping-tag-card {
+        border: 2px dashed #0f172a;
+        border-radius: 10px;
+        padding: 14px;
+        background: #fafafa;
+      }
+      .st-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid #0f172a;
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+      }
+      .st-logo {
+        font-size: 1.1rem;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+      }
+      .st-carrier {
+        font-size: 0.75rem;
+        font-weight: 800;
+        background: #0f172a;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        text-transform: uppercase;
+      }
+      .st-grid {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+      }
+      .st-field-title {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+      }
+      .st-field-val {
+        font-size: 0.85rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 6px;
+      }
+      .st-qr-wrap {
+        background: white;
+        padding: 6px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .st-footer-bar {
+        border-top: 1px solid #cbd5e1;
+        margin-top: 10px;
+        padding-top: 8px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.65rem;
+        color: #64748b;
+        font-weight: 600;
+      }
+
+      /* ESTILOS DE IMPRESIÓN EXCLUSIVA DE ETIQUETA */
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        #label-modal,
+        #printable-shipping-label,
+        #printable-shipping-label * {
+          visibility: visible;
+        }
+        #label-modal {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          background: white;
+          padding: 0;
+          margin: 0;
+          display: block !important;
+        }
+        .label-box {
+          box-shadow: none;
+          border-radius: 0;
+          padding: 0;
+          max-width: 100%;
+          width: 100%;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .shipping-tag-card {
+          border: 2px solid black;
+          background: white;
+        }
       }
     </style>
   </head>
@@ -370,6 +604,40 @@
         </div>
       </div>
 
+      <!-- CÁMARA GLOBAL (ACCESIBLE DESDE CUALQUIER PESTAÑA) -->
+      <div id="global-camera-card">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+          "
+        >
+          <span
+            style="font-size: 0.8rem; font-weight: 700; color: var(--accent)"
+            id="camera-target-label"
+            >📷 Escaneando código...</span
+          >
+          <button
+            onclick="stopCamera()"
+            style="
+              background: #f43f5e;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              padding: 4px 8px;
+              font-size: 0.75rem;
+              cursor: pointer;
+              font-weight: 700;
+            "
+          >
+            ✕ Cerrar
+          </button>
+        </div>
+        <div id="reader"></div>
+      </div>
+
       <!-- PESTAÑA 1: PICK & PACK (DESPACHO) -->
       <section id="view-dispatch">
         <div class="card">
@@ -383,19 +651,15 @@
               margin-bottom: 14px;
             "
           >
-            Escaneá con la cámara o tipear el código directamente.
+            Escaneá con la cámara o tipeá el código directamente.
           </p>
 
           <button
             class="btn btn-camera"
-            id="btn-cam"
-            onclick="toggleCameraScanner()"
+            onclick="startCameraFor('dispatch-code', 'Despacho de Pedidos')"
           >
             📷 Activar Escáner de Cámara
           </button>
-          <div id="reader-container">
-            <div id="reader" style="width: 100%"></div>
-          </div>
 
           <label class="field-label">Código EAN-13 o SKU</label>
           <input
@@ -406,6 +670,15 @@
             oninput="checkDispatchBtn()"
             onkeydown="if (event.key === 'Enter') submitDispatch();"
           />
+
+          <!-- TARJETA DINÁMICA DE UBICACIÓN FÍSICA -->
+          <div id="bin-location-box">
+            <div class="bin-title">📍 Ubicación en Depósito (Layout en U)</div>
+            <div id="bin-location-txt" class="bin-coord">PAS-01-EST-A1</div>
+            <div id="bin-location-desc" class="bin-details">
+              Remera Oversize M - Negro (Clase A)
+            </div>
+          </div>
 
           <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px">
             <div>
@@ -438,7 +711,7 @@
             disabled
             onclick="submitDispatch()"
           >
-            Confirmar Despacho (Pick & Pack)
+            Confirmar y Emitir Rótulo de Bulto
           </button>
         </div>
 
@@ -453,19 +726,142 @@
         </div>
       </section>
 
-      <!-- PESTAÑA 2: INVENTARIO & REORDEN -->
+      <!-- PESTAÑA 2: LOGÍSTICA INVERSA (DEVOLUCIONES Y CAMBIOS) -->
+      <section id="view-reverse" style="display: none">
+        <div class="card" style="border-top: 4px solid var(--purple)">
+          <h3 style="font-size: 1rem; margin-bottom: 4px">
+            Logística Inversa (Cambios y Retornos)
+          </h3>
+          <p
+            style="
+              font-size: 0.8rem;
+              color: var(--text-muted);
+              margin-bottom: 14px;
+            "
+          >
+            Recepción y triage de devoluciones vía Andreani o retiro en
+            depósito.
+          </p>
+
+          <button
+            class="btn btn-camera"
+            style="color: var(--purple)"
+            onclick="startCameraFor('reverse-code', 'Prenda Retornada')"
+          >
+            📷 Escanear Prenda Retornada
+          </button>
+
+          <label class="field-label">Código EAN-13 o SKU Devuelto</label>
+          <input
+            type="text"
+            id="reverse-code"
+            class="input-control"
+            placeholder="Escanear o tipear artículo..."
+            oninput="checkReverseBtn()"
+          />
+
+          <label class="field-label">Clasificación / Triage de la Prenda</label>
+          <div class="condition-grid">
+            <div
+              class="condition-card active-apto"
+              id="opt-apto"
+              onclick="setCondition('APTO')"
+            >
+              <div class="condition-title" style="color: var(--success)">
+                ✓ APTO PARA VENTA
+              </div>
+              <div class="condition-desc">Reingresa al stock comercial</div>
+            </div>
+            <div
+              class="condition-card"
+              id="opt-no-apto"
+              onclick="setCondition('NO_APTO')"
+            >
+              <div class="condition-title" style="color: var(--danger)">
+                ⚠ NO APTO (FALLADO)
+              </div>
+              <div class="condition-desc">Pasa a Segunda / Merma</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+            <div>
+              <label class="field-label">Motivo de Retorno</label>
+              <select id="reverse-motivo" class="input-control">
+                <option value="Cambio de Talle">Cambio de Talle</option>
+                <option value="Disconformidad con Calce">
+                  Disconformidad / Devolución
+                </option>
+                <option value="Falla de Confección">Falla de Confección</option>
+                <option value="Falla de Estampado">Falla de Estampado</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Transporte</label>
+              <select id="reverse-transporte" class="input-control">
+                <option value="Andreani Retorno">Andreani Retorno</option>
+                <option value="Entrega en Depósito">Entrega en Depósito</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px">
+            <div>
+              <label class="field-label">Detalle / Obs</label>
+              <input
+                type="text"
+                id="reverse-obs"
+                class="input-control"
+                value="Recepción en depósito"
+                placeholder="Detalle adicional..."
+              />
+            </div>
+            <div>
+              <label class="field-label">Cantidad</label>
+              <input
+                type="number"
+                id="reverse-cant"
+                class="input-control"
+                value="1"
+                min="1"
+              />
+            </div>
+          </div>
+
+          <button
+            class="btn btn-reverse"
+            id="btn-submit-reverse"
+            disabled
+            onclick="submitReverseLogistics()"
+          >
+            Procesar Devolución
+          </button>
+        </div>
+
+        <div class="card">
+          <label class="field-label">Último Retorno Procesado</label>
+          <div
+            id="reverse-feedback"
+            style="font-size: 0.85rem; color: var(--text-muted)"
+          >
+            Sin retornos procesados en esta sesión.
+          </div>
+        </div>
+      </section>
+
+      <!-- PESTAÑA 3: INVENTARIO & REORDEN -->
       <section id="view-stock" style="display: none">
         <input
           type="text"
           id="stock-search"
           class="input-control"
-          placeholder="🔍 Filtrar por nombre, talle o SKU..."
+          placeholder="🔍 Filtrar por nombre, talle, SKU o rack..."
           oninput="renderStockView()"
         />
         <div id="stock-container">Cargando catálogo...</div>
       </section>
 
-      <!-- PESTAÑA 3: INGRESO DE PROVEEDORES -->
+      <!-- PESTAÑA 4: INGRESO DE PROVEEDORES -->
       <section id="view-reception" style="display: none">
         <div class="card">
           <h3 style="font-size: 1rem; margin-bottom: 4px">
@@ -521,15 +917,98 @@
           </button>
         </div>
       </section>
+
+      <!-- MODAL DE RÓTULO DE BULTO / CAJA KRAFT (PRIORIDAD 4) -->
+      <div id="label-modal">
+        <div class="label-box">
+          <div id="printable-shipping-label" class="shipping-tag-card">
+            <div class="st-header">
+              <div class="st-logo">KINDO // LOG</div>
+              <div class="st-carrier" id="lbl-carrier">UBER FLASH</div>
+            </div>
+
+            <div class="st-grid">
+              <div>
+                <div class="st-field-title">ID Envío / Tracking Bulto</div>
+                <div
+                  class="st-field-val"
+                  id="lbl-tracking"
+                  style="font-family: &quot;JetBrains Mono&quot;, monospace"
+                >
+                  KND-EXP-000000
+                </div>
+
+                <div class="st-field-title">Contenido del Bulto</div>
+                <div class="st-field-val" id="lbl-item-desc">
+                  Remera Oversize - M
+                </div>
+
+                <div class="st-field-title">Cantidad Total</div>
+                <div class="st-field-val" id="lbl-cant">1 Unidad(es)</div>
+              </div>
+
+              <div class="st-qr-wrap">
+                <div id="label-qrcode"></div>
+              </div>
+            </div>
+
+            <div class="st-footer-bar">
+              <span>ORIGEN: DARK STORE GENERAL PAZ</span>
+              <span id="lbl-timestamp">--/-- --:--</span>
+            </div>
+          </div>
+
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8px;
+              margin-top: 14px;
+            "
+            class="no-print"
+          >
+            <button
+              class="btn btn-primary"
+              style="background: #0f172a; padding: 10px"
+              onclick="window.print()"
+            >
+              🖨 Imprimir
+            </button>
+            <button
+              class="btn btn-primary"
+              style="background: #64748b; padding: 10px"
+              onclick="closeLabelModal()"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- FOOTER DISCRETO CON CONTROL DE VERSIONES -->
+      <footer class="version-footer">
+        <span
+          >KINDO OPS // CLIENT:
+          <b class="version-tag" id="ver-client">v3.3.0-ui</b></span
+        >
+        &nbsp;|&nbsp;
+        <span
+          >BACKEND:
+          <b class="version-tag" id="ver-backend">Conectando...</b></span
+        >
+      </footer>
     </main>
 
-    <!-- BARRA NAVEGACIÓN INFERIOR -->
+    <!-- BARRA NAVEGACIÓN INFERIOR (4 PESTAÑAS) -->
     <nav class="nav-tabs">
       <button class="tab-item active" onclick="switchNav('dispatch', this)">
         <span>📦</span> Despacho
       </button>
+      <button class="tab-item" onclick="switchNav('reverse', this)">
+        <span>🔄</span> Retornos
+      </button>
       <button class="tab-item" onclick="switchNav('stock', this)">
-        <span>📋</span> Stock & ROP
+        <span>📋</span> Stock
       </button>
       <button class="tab-item" onclick="switchNav('reception', this)">
         <span>📥</span> Recepción
@@ -540,7 +1019,8 @@
     </nav>
 
     <script>
-      // ENDPOINT OFICIAL APPS SCRIPT
+      // CONTROL DE VERSIONES Y CONFIGURACIÓN
+      const HTML_VERSION = "v3.3.0-ui";
       const GAS_URL =
         "https://script.google.com/macros/s/AKfycbxFWAZ00PqdswIasjKV0T_qT7yqUliFD-6EybpXVhslgxthhIiIzcJKU_TMLwYjMcek/exec";
       const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;
@@ -550,50 +1030,117 @@
       let html5QrCode = null;
       let isCameraActive = false;
       let clientIP = "Detectando...";
+      let selectedCondition = "APTO";
+      let currentCameraInputId = "dispatch-code";
+      let qrCodeInstance = null;
 
-      // Obtener IP pública del cliente para el log de auditoría
+      function devLog(module, msg, data = null) {
+        const time = new Date().toLocaleTimeString("es-AR", { hour12: false });
+        const tag = `%c[KINDO-OPS ${time}] [${module}]`;
+        const style =
+          "background: #1e1e38; color: #38bdf8; font-weight: bold; padding: 2px 6px; border-radius: 4px;";
+        if (data) console.log(tag, style, msg, data);
+        else console.log(tag, style, msg);
+      }
+
       function fetchClientIP() {
         fetch("https://api.ipify.org?format=json")
           .then((r) => r.json())
           .then((d) => {
             clientIP = d.ip;
+            devLog("NETWORK", `IP detectada: ${clientIP}`);
           })
           .catch(() => {
             clientIP = "No disponible";
           });
       }
 
-      // Validación del botón Confirmar
-      function checkDispatchBtn() {
-        const val = document.getElementById("dispatch-code").value.trim();
-        document.getElementById("btn-submit-dispatch").disabled =
-          val.length === 0;
-      }
-
-      // NORMALIZACIÓN INTELIGENTE Y PARCHE ÓPTICO (579 -> 779)
       function sanitizeToken(t) {
         let clean = String(t || "")
           .replace(/[\*\s\-]/g, "")
           .toUpperCase()
           .trim();
-
-        // Si la cámara leyó 579 en vez de 779 (13 dígitos)
-        if (clean.length === 13 && clean.startsWith("579")) {
+        if (clean.length === 13 && clean.startsWith("579"))
           clean = "7" + clean.substring(1);
-        }
-        // Si leyó 14 dígitos con un 5 o cero adelante (ej: 5779... o 0779...)
         if (
           clean.length === 14 &&
           (clean.startsWith("5779") || clean.startsWith("0779"))
-        ) {
+        )
           clean = clean.substring(1);
-        }
         return clean;
       }
 
-      // GESTIÓN DE SESIÓN DE 8 HORAS
+      function findCatalogItem(cleanCode) {
+        if (!cleanCode) return null;
+        return catalog.find((i) => {
+          if (!i.sku || i.sku.toUpperCase().includes("TOTAL")) return false;
+          const itemEan = sanitizeToken(i.ean);
+          const itemSku = sanitizeToken(i.sku);
+          if (itemEan === cleanCode || itemSku === cleanCode) return true;
+          if (
+            itemEan.length >= 8 &&
+            (cleanCode.endsWith(itemEan) || itemEan.endsWith(cleanCode))
+          )
+            return true;
+          return false;
+        });
+      }
+
+      function checkDispatchBtn() {
+        const inputEl = document.getElementById("dispatch-code");
+        const clean = sanitizeToken(inputEl.value);
+        const binBox = document.getElementById("bin-location-box");
+        const btn = document.getElementById("btn-submit-dispatch");
+
+        if (!clean) {
+          binBox.style.display = "none";
+          btn.disabled = true;
+          return;
+        }
+
+        const item = findCatalogItem(clean);
+        if (item) {
+          document.getElementById("bin-location-txt").innerText =
+            item.ubicacion || "PAS-01-EST-A1";
+          document.getElementById("bin-location-desc").innerText =
+            `${item.desc} — Clase ${item.abc} (${item.cat})`;
+          binBox.style.display = "block";
+          btn.disabled = false;
+        } else {
+          binBox.style.display = "none";
+          btn.disabled = true;
+        }
+      }
+
+      function setCondition(cond) {
+        selectedCondition = cond;
+        const optApto = document.getElementById("opt-apto");
+        const optNoApto = document.getElementById("opt-no-apto");
+
+        if (cond === "APTO") {
+          optApto.className = "condition-card active-apto";
+          optNoApto.className = "condition-card";
+        } else {
+          optApto.className = "condition-card";
+          optNoApto.className = "condition-card active-no-apto";
+        }
+        devLog("REVERSE", `Condición establecida: ${cond}`);
+      }
+
+      function checkReverseBtn() {
+        const clean = sanitizeToken(
+          document.getElementById("reverse-code").value,
+        );
+        const btn = document.getElementById("btn-submit-reverse");
+        const item = findCatalogItem(clean);
+        btn.disabled = !clean || !item;
+      }
+
+      // GESTIÓN DE SESIÓN
       function verifySession() {
+        document.getElementById("ver-client").innerText = HTML_VERSION;
         fetchClientIP();
+
         const stored = localStorage.getItem("kindo_session_data");
         const stamp = localStorage.getItem("kindo_session_stamp");
 
@@ -623,6 +1170,8 @@
         callAPI("login", { pin: pin }, (res) => {
           if (res && res.status === "success") {
             currentUser = res.user;
+            if (res.version)
+              document.getElementById("ver-backend").innerText = res.version;
             localStorage.setItem(
               "kindo_session_data",
               JSON.stringify(currentUser),
@@ -643,41 +1192,33 @@
         localStorage.removeItem("kindo_session_data");
         localStorage.removeItem("kindo_session_stamp");
         currentUser = null;
-
-        if (html5QrCode && isCameraActive) {
-          html5QrCode
-            .stop()
-            .then(() => {
-              isCameraActive = false;
-              document.getElementById("reader-container").style.display =
-                "none";
-              document.getElementById("btn-cam").innerText =
-                "📷 Activar Escáner de Cámara";
-            })
-            .catch(() => {});
-        }
-
+        stopCamera();
         document.getElementById("user-display").innerText = "Turno Inactivo";
         document.getElementById("login-pin").value = "";
         document.getElementById("login-error").innerText = "";
         document.getElementById("login-modal").style.display = "flex";
       }
 
-      // CONECTOR JSONP CON AUDITORÍA (IP Y USER AGENT)
+      // CONECTOR JSONP CON PROPAGACIÓN DE VERSIÓN
       function callAPI(action, params, callback) {
         const cbName =
           "kindo_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
         const script = document.createElement("script");
+        const startTime = performance.now();
+
+        params.ip = clientIP;
+        params.ua = navigator.userAgent;
 
         window[cbName] = function (data) {
+          const duration = Math.round(performance.now() - startTime);
+          devLog("API", `Respuesta para [${action}] (${duration}ms):`, data);
+          if (data && data.version) {
+            document.getElementById("ver-backend").innerText = data.version;
+          }
           callback(data);
           delete window[cbName];
           if (script.parentNode) script.parentNode.removeChild(script);
         };
-
-        // Inyección de parámetros de auditoría
-        params.ip = clientIP;
-        params.ua = navigator.userAgent;
 
         let qs = `${GAS_URL}?action=${action}&callback=${cbName}`;
         for (const k in params) {
@@ -685,20 +1226,30 @@
         }
 
         script.src = qs;
-        script.onerror = () => {
+        script.onerror = (e) => {
+          devLog("API", `Error en [${action}]`, e);
           document.getElementById("kpi-sync").innerText = "🔴";
-          alert("Error de conexión con el backend de Google Sheets.");
         };
         document.body.appendChild(script);
       }
 
       function fetchStock() {
+        const cached = localStorage.getItem("kindo_cached_catalog");
+        if (cached && catalog.length === 0) {
+          catalog = JSON.parse(cached);
+          updateKPIs();
+          renderStockView();
+        }
+
         document.getElementById("kpi-sync").innerText = "🟡";
         callAPI("getStock", {}, (res) => {
           if (res && res.status === "success") {
-            // Descartamos cualquier fila que sea TOTALES
             catalog = res.data.filter(
               (i) => i.sku && !i.sku.toUpperCase().includes("TOTAL"),
+            );
+            localStorage.setItem(
+              "kindo_cached_catalog",
+              JSON.stringify(catalog),
             );
             document.getElementById("kpi-sync").innerText = "🟢";
             updateKPIs();
@@ -715,51 +1266,26 @@
         const alertsCount = catalog.filter(
           (item) => item.estado !== "OK",
         ).length;
-
         document.getElementById("kpi-units").innerText = totalUnits;
         document.getElementById("kpi-alerts").innerText = alertsCount;
       }
 
-      // DESPACHO / PICK & PACK (BLINDADO CONTRA STRING VACÍO Y TOTALES)
+      // ACCIÓN: PICK & PACK + EMISIÓN DE RÓTULO DE BULTO (PRIORIDAD 4)
       function submitDispatch() {
         const inputEl = document.getElementById("dispatch-code");
-        const rawCode = inputEl.value;
-        const cleanCode = sanitizeToken(rawCode);
+        const cleanCode = sanitizeToken(inputEl.value);
         const canal = document.getElementById("dispatch-canal").value;
         const cant =
           parseInt(document.getElementById("dispatch-cant").value, 10) || 1;
 
         if (!cleanCode) return;
+        const item = findCatalogItem(cleanCode);
+        if (!item) return;
 
-        // Match estricto: el EAN/SKU del catálogo NO puede estar vacío ni ser TOTALES
-        const item = catalog.find((i) => {
-          if (!i.sku || i.sku.toUpperCase().includes("TOTAL")) return false;
+        // Generar Tracking ID único para la caja de embalaje Kraft
+        const trackingId = "KND-EXP-" + Date.now().toString().slice(-6);
 
-          const itemEan = sanitizeToken(i.ean);
-          const itemSku = sanitizeToken(i.sku);
-
-          // 1. Coincidencia exacta
-          if (itemEan === cleanCode || itemSku === cleanCode) return true;
-
-          // 2. Coincidencia por terminación SOLO si el item tiene EAN cargado (mínimo 8 dígitos)
-          if (itemEan.length >= 8) {
-            if (cleanCode.endsWith(itemEan) || itemEan.endsWith(cleanCode))
-              return true;
-          }
-
-          return false;
-        });
-
-        if (!item) {
-          alert(
-            "❌ No se encontró ningún producto para el código leído:\n[" +
-              cleanCode +
-              "]\n\nVerificá que el SKU o código de barras exista en la planilla.",
-          );
-          return;
-        }
-
-        // Optimistic update en pantalla
+        // Optimistic update
         item.stockActual -= cant;
         if (item.stockActual <= 0) item.estado = "QUIEBRE";
         else if (item.stockActual <= item.ptoPedido) item.estado = "REORDEN";
@@ -773,84 +1299,214 @@
           minute: "2-digit",
           second: "2-digit",
         });
-        logBox.innerHTML = `<span style="color: var(--success); font-weight:700;">✓ [${time}]</span> Despachadas ${cant}u de <b>${item.desc}</b> (${canal})`;
+        logBox.innerHTML = `<span style="color: var(--success); font-weight:700;">✓ [${time}]</span> Despachadas ${cant}u de <b>${item.desc}</b> (${canal}) — 🏷 Bulto: <b>${trackingId}</b>`;
 
         inputEl.value = "";
         checkDispatchBtn();
         inputEl.focus();
 
+        // Abrir modal de rotulado para la caja
+        showShippingLabel({
+          trackingId: trackingId,
+          carrier: canal,
+          itemDesc: item.desc,
+          cant: cant,
+          sku: item.sku,
+          time: time,
+        });
+
+        // Registro asíncrono sin bloquear la app
         callAPI(
           "dispatch",
           {
             code: item.sku,
             cant: cant,
             canal: canal,
+            trackingId: trackingId,
             author: currentUser.nombre,
           },
           (res) => {
-            if (!res || res.status !== "success") fetchStock();
+            if (!res || res.status !== "success") {
+              devLog(
+                "PICK-PACK",
+                "Error al asentar despacho en Google Sheet:",
+                res,
+              );
+            }
           },
         );
       }
 
-      // ESCÁNER DE CÁMARA
-      function toggleCameraScanner() {
-        const readerDiv = document.getElementById("reader-container");
-        const btn = document.getElementById("btn-cam");
+      // RENDERIZADO DEL RÓTULO DE EMBALAJE (QR + DATOS DEL DESTINO)
+      function showShippingLabel(data) {
+        document.getElementById("lbl-carrier").innerText = data.carrier
+          .split(" ")[0]
+          .toUpperCase();
+        document.getElementById("lbl-tracking").innerText = data.trackingId;
+        document.getElementById("lbl-item-desc").innerText = data.itemDesc;
+        document.getElementById("lbl-cant").innerText =
+          `${data.cant} Unidad(es) [${data.sku}]`;
+        document.getElementById("lbl-timestamp").innerText =
+          `${new Date().toLocaleDateString("es-AR")} ${data.time}`;
 
-        if (isCameraActive) {
+        const qrContainer = document.getElementById("label-qrcode");
+        qrContainer.innerHTML = "";
+
+        const qrPayload = JSON.stringify({
+          id: data.trackingId,
+          sku: data.sku,
+          qty: data.cant,
+          courier: data.carrier,
+          hub: "Dark Store General Paz CBA",
+        });
+
+        qrCodeInstance = new QRCode(qrContainer, {
+          text: qrPayload,
+          width: 100,
+          height: 100,
+          colorDark: "#0f172a",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+
+        document.getElementById("label-modal").style.display = "flex";
+        devLog("PACKING", `Rótulo emitido para bulto ${data.trackingId}`, data);
+      }
+
+      function closeLabelModal() {
+        document.getElementById("label-modal").style.display = "none";
+      }
+
+      // ACCIÓN: LOGÍSTICA INVERSA
+      function submitReverseLogistics() {
+        const cleanCode = sanitizeToken(
+          document.getElementById("reverse-code").value,
+        );
+        const cant =
+          parseInt(document.getElementById("reverse-cant").value, 10) || 1;
+        const motivo = document.getElementById("reverse-motivo").value;
+        const transporte = document.getElementById("reverse-transporte").value;
+
+        if (!cleanCode) return;
+        const item = findCatalogItem(cleanCode);
+        if (!item) return;
+
+        if (selectedCondition === "APTO") {
+          item.stockActual += cant;
+          if (item.stockActual > item.ptoPedido) item.estado = "OK";
+          updateKPIs();
+          renderStockView();
+        }
+
+        const logBox = document.getElementById("reverse-feedback");
+        const time = new Date().toLocaleTimeString("es-AR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const color =
+          selectedCondition === "APTO" ? "var(--success)" : "var(--danger)";
+        const label =
+          selectedCondition === "APTO"
+            ? "Reingresado a Stock Comercial"
+            : "Derivado a Merma / Segunda";
+
+        logBox.innerHTML = `<span style="color: ${color}; font-weight:700;">✓ [${time}]</span> Retorno de ${cant}u de <b>${item.desc}</b>: <b>${label}</b> (${motivo})`;
+
+        document.getElementById("reverse-code").value = "";
+        checkReverseBtn();
+
+        devLog(
+          "REVERSE",
+          `Procesando retorno: ${cant}u de ${item.sku} en estado ${selectedCondition}`,
+        );
+        callAPI(
+          "reverseLogistics",
+          {
+            code: item.sku,
+            cant: cant,
+            condicion: selectedCondition,
+            motivo: motivo,
+            transporte: transporte,
+            author: currentUser.nombre,
+          },
+          (res) => {
+            if (!res || res.status !== "success") {
+              devLog("REVERSE", "Error al asentar en Google Sheet:", res);
+            } else {
+              devLog("REVERSE", "✓ Asentado con éxito en el servidor.");
+            }
+          },
+        );
+      }
+
+      // CÁMARA GLOBAL UNIFICADA
+      function startCameraFor(inputId, label) {
+        currentCameraInputId = inputId;
+        document.getElementById("camera-target-label").innerText =
+          `📷 Escaneando para: ${label}`;
+        const camCard = document.getElementById("global-camera-card");
+        camCard.style.display = "block";
+
+        if (isCameraActive && html5QrCode) {
+          return;
+        }
+
+        const formatsToSupport = [
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+        ];
+        html5QrCode = new Html5Qrcode("reader", {
+          formatsToSupport: formatsToSupport,
+          verbose: false,
+        });
+
+        html5QrCode
+          .start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 120 } },
+            (decodedText) => {
+              const parsed = sanitizeToken(decodedText);
+              const targetEl = document.getElementById(currentCameraInputId);
+              if (targetEl) {
+                targetEl.value = parsed;
+                if (currentCameraInputId === "dispatch-code")
+                  checkDispatchBtn();
+                if (currentCameraInputId === "reverse-code") checkReverseBtn();
+              }
+              if (navigator.vibrate) navigator.vibrate(100);
+              stopCamera();
+            },
+            () => {},
+          )
+          .then(() => {
+            isCameraActive = true;
+          })
+          .catch(() => {
+            alert("No se pudo acceder a la cámara.");
+            stopCamera();
+          });
+      }
+
+      function stopCamera() {
+        if (html5QrCode && isCameraActive) {
           html5QrCode
             .stop()
             .then(() => {
-              readerDiv.style.display = "none";
-              btn.innerText = "📷 Activar Escáner de Cámara";
               isCameraActive = false;
+              document.getElementById("global-camera-card").style.display =
+                "none";
             })
             .catch(() => {});
         } else {
-          readerDiv.style.display = "block";
-          btn.innerText = "⏹ Apagar Cámara";
-
-          const formatsToSupport = [
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.EAN_13,
-          ];
-          html5QrCode = new Html5Qrcode("reader", {
-            formatsToSupport: formatsToSupport,
-            verbose: false,
-          });
-
-          html5QrCode
-            .start(
-              { facingMode: "environment" },
-              { fps: 10, qrbox: { width: 250, height: 120 } },
-              (decodedText) => {
-                const parsed = sanitizeToken(decodedText);
-
-                const inputEl = document.getElementById("dispatch-code");
-                inputEl.value = parsed;
-                checkDispatchBtn();
-
-                if (navigator.vibrate) navigator.vibrate(100);
-                toggleCameraScanner();
-              },
-              () => {},
-            )
-            .then(() => {
-              isCameraActive = true;
-            })
-            .catch(() => {
-              alert("No se pudo acceder a la cámara.");
-              readerDiv.style.display = "none";
-              btn.innerText = "📷 Activar Escáner de Cámara";
-              isCameraActive = false;
-            });
+          document.getElementById("global-camera-card").style.display = "none";
         }
       }
 
       function submitReception() {
-        const rawCode = document.getElementById("rec-code").value;
-        const cleanCode = sanitizeToken(rawCode);
+        const cleanCode = sanitizeToken(
+          document.getElementById("rec-code").value,
+        );
         const prov = document.getElementById("rec-prov").value;
         const cant =
           parseInt(document.getElementById("rec-cant").value, 10) || 0;
@@ -874,11 +1530,7 @@
               document.getElementById("rec-code").value = "";
               document.getElementById("rec-cant").value = "";
               fetchStock();
-              switchNav("stock", document.querySelectorAll(".tab-item")[1]);
-            } else {
-              alert(
-                "Error: " + (res.message || "No se pudo registrar el ingreso."),
-              );
+              switchNav("stock", document.querySelectorAll(".tab-item")[2]);
             }
           },
         );
@@ -894,7 +1546,8 @@
             !q ||
             sanitizeToken(i.desc).includes(q) ||
             sanitizeToken(i.sku).includes(q) ||
-            sanitizeToken(i.ean).includes(q)
+            sanitizeToken(i.ean).includes(q) ||
+            sanitizeToken(i.ubicacion).includes(q)
           );
         });
 
@@ -924,7 +1577,7 @@
           <div>
             <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 2px;">${item.desc}</div>
             <div style="font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
-              SKU: ${item.sku} | ROP: ${item.ptoPedido}u | Seg: ${item.stockSeg}u
+              SKU: ${item.sku} | 📍 <b>${item.ubicacion || "PAS-01"}</b> | ROP: ${item.ptoPedido}u
             </div>
           </div>
           <div style="text-align: right;">
@@ -937,8 +1590,11 @@
       }
 
       function switchNav(view, btn) {
+        stopCamera();
         document.getElementById("view-dispatch").style.display =
           view === "dispatch" ? "block" : "none";
+        document.getElementById("view-reverse").style.display =
+          view === "reverse" ? "block" : "none";
         document.getElementById("view-stock").style.display =
           view === "stock" ? "block" : "none";
         document.getElementById("view-reception").style.display =

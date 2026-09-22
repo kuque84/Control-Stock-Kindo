@@ -16,6 +16,8 @@
 
     <!-- Lector de Código de Barras por Cámara -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- Generador de Códigos QR para Rótulos de Envío -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <style>
       :root {
@@ -412,6 +414,131 @@
         border-radius: 4px;
         border: 1px solid #232f48;
       }
+
+      /* MODAL DE RÓTULO DE ENVÍO / PACKING (PRIORIDAD 4) */
+      #label-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(9, 13, 22, 0.92);
+        backdrop-filter: blur(8px);
+        z-index: 9998;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      .label-box {
+        background: white;
+        color: #0f172a;
+        width: 100%;
+        max-width: 360px;
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+        font-family: "Plus Jakarta Sans", sans-serif;
+      }
+      .shipping-tag-card {
+        border: 2px dashed #0f172a;
+        border-radius: 10px;
+        padding: 14px;
+        background: #fafafa;
+      }
+      .st-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid #0f172a;
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+      }
+      .st-logo {
+        font-size: 1.1rem;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+      }
+      .st-carrier {
+        font-size: 0.75rem;
+        font-weight: 800;
+        background: #0f172a;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        text-transform: uppercase;
+      }
+      .st-grid {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+      }
+      .st-field-title {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+      }
+      .st-field-val {
+        font-size: 0.85rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 6px;
+      }
+      .st-qr-wrap {
+        background: white;
+        padding: 6px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .st-footer-bar {
+        border-top: 1px solid #cbd5e1;
+        margin-top: 10px;
+        padding-top: 8px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.65rem;
+        color: #64748b;
+        font-weight: 600;
+      }
+
+      /* ESTILOS DE IMPRESIÓN EXCLUSIVA DE ETIQUETA */
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        #label-modal,
+        #printable-shipping-label,
+        #printable-shipping-label * {
+          visibility: visible;
+        }
+        #label-modal {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          background: white;
+          padding: 0;
+          margin: 0;
+          display: block !important;
+        }
+        .label-box {
+          box-shadow: none;
+          border-radius: 0;
+          padding: 0;
+          max-width: 100%;
+          width: 100%;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .shipping-tag-card {
+          border: 2px solid black;
+          background: white;
+        }
+      }
     </style>
   </head>
   <body>
@@ -584,7 +711,7 @@
             disabled
             onclick="submitDispatch()"
           >
-            Confirmar Despacho (Pick & Pack)
+            Confirmar y Emitir Rótulo de Bulto
           </button>
         </div>
 
@@ -791,11 +918,78 @@
         </div>
       </section>
 
+      <!-- MODAL DE RÓTULO DE BULTO / CAJA KRAFT (PRIORIDAD 4) -->
+      <div id="label-modal">
+        <div class="label-box">
+          <div id="printable-shipping-label" class="shipping-tag-card">
+            <div class="st-header">
+              <div class="st-logo">KINDO // LOG</div>
+              <div class="st-carrier" id="lbl-carrier">UBER FLASH</div>
+            </div>
+
+            <div class="st-grid">
+              <div>
+                <div class="st-field-title">ID Envío / Tracking Bulto</div>
+                <div
+                  class="st-field-val"
+                  id="lbl-tracking"
+                  style="font-family: &quot;JetBrains Mono&quot;, monospace"
+                >
+                  KND-EXP-000000
+                </div>
+
+                <div class="st-field-title">Contenido del Bulto</div>
+                <div class="st-field-val" id="lbl-item-desc">
+                  Remera Oversize - M
+                </div>
+
+                <div class="st-field-title">Cantidad Total</div>
+                <div class="st-field-val" id="lbl-cant">1 Unidad(es)</div>
+              </div>
+
+              <div class="st-qr-wrap">
+                <div id="label-qrcode"></div>
+              </div>
+            </div>
+
+            <div class="st-footer-bar">
+              <span>ORIGEN: DARK STORE GENERAL PAZ</span>
+              <span id="lbl-timestamp">--/-- --:--</span>
+            </div>
+          </div>
+
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8px;
+              margin-top: 14px;
+            "
+            class="no-print"
+          >
+            <button
+              class="btn btn-primary"
+              style="background: #0f172a; padding: 10px"
+              onclick="window.print()"
+            >
+              🖨 Imprimir
+            </button>
+            <button
+              class="btn btn-primary"
+              style="background: #64748b; padding: 10px"
+              onclick="closeLabelModal()"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- FOOTER DISCRETO CON CONTROL DE VERSIONES -->
       <footer class="version-footer">
         <span
           >KINDO OPS // CLIENT:
-          <b class="version-tag" id="ver-client">v3.2.0-ui</b></span
+          <b class="version-tag" id="ver-client">v3.3.0-ui</b></span
         >
         &nbsp;|&nbsp;
         <span
@@ -826,7 +1020,7 @@
 
     <script>
       // CONTROL DE VERSIONES Y CONFIGURACIÓN
-      const HTML_VERSION = "v3.2.1-ui";
+      const HTML_VERSION = "v3.3.0-ui";
       const GAS_URL =
         "https://script.google.com/macros/s/AKfycbxFWAZ00PqdswIasjKV0T_qT7yqUliFD-6EybpXVhslgxthhIiIzcJKU_TMLwYjMcek/exec";
       const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;
@@ -838,6 +1032,7 @@
       let clientIP = "Detectando...";
       let selectedCondition = "APTO";
       let currentCameraInputId = "dispatch-code";
+      let qrCodeInstance = null;
 
       function devLog(module, msg, data = null) {
         const time = new Date().toLocaleTimeString("es-AR", { hour12: false });
@@ -1075,7 +1270,7 @@
         document.getElementById("kpi-alerts").innerText = alertsCount;
       }
 
-      // ACCIÓN: PICK & PACK
+      // ACCIÓN: PICK & PACK + EMISIÓN DE RÓTULO DE BULTO (PRIORIDAD 4)
       function submitDispatch() {
         const inputEl = document.getElementById("dispatch-code");
         const cleanCode = sanitizeToken(inputEl.value);
@@ -1087,6 +1282,10 @@
         const item = findCatalogItem(cleanCode);
         if (!item) return;
 
+        // Generar Tracking ID único para la caja de embalaje Kraft
+        const trackingId = "KND-EXP-" + Date.now().toString().slice(-6);
+
+        // Optimistic update
         item.stockActual -= cant;
         if (item.stockActual <= 0) item.estado = "QUIEBRE";
         else if (item.stockActual <= item.ptoPedido) item.estado = "REORDEN";
@@ -1100,24 +1299,82 @@
           minute: "2-digit",
           second: "2-digit",
         });
-        logBox.innerHTML = `<span style="color: var(--success); font-weight:700;">✓ [${time}]</span> Despachadas ${cant}u de <b>${item.desc}</b> (${canal}) — 📍 Rack: <b>${item.ubicacion}</b>`;
+        logBox.innerHTML = `<span style="color: var(--success); font-weight:700;">✓ [${time}]</span> Despachadas ${cant}u de <b>${item.desc}</b> (${canal}) — 🏷 Bulto: <b>${trackingId}</b>`;
 
         inputEl.value = "";
         checkDispatchBtn();
         inputEl.focus();
 
+        // Abrir modal de rotulado para la caja
+        showShippingLabel({
+          trackingId: trackingId,
+          carrier: canal,
+          itemDesc: item.desc,
+          cant: cant,
+          sku: item.sku,
+          time: time,
+        });
+
+        // Registro asíncrono sin bloquear la app
         callAPI(
           "dispatch",
           {
             code: item.sku,
             cant: cant,
             canal: canal,
+            trackingId: trackingId,
             author: currentUser.nombre,
           },
           (res) => {
-            if (!res || res.status !== "success") fetchStock();
+            if (!res || res.status !== "success") {
+              devLog(
+                "PICK-PACK",
+                "Error al asentar despacho en Google Sheet:",
+                res,
+              );
+            }
           },
         );
+      }
+
+      // RENDERIZADO DEL RÓTULO DE EMBALAJE (QR + DATOS DEL DESTINO)
+      function showShippingLabel(data) {
+        document.getElementById("lbl-carrier").innerText = data.carrier
+          .split(" ")[0]
+          .toUpperCase();
+        document.getElementById("lbl-tracking").innerText = data.trackingId;
+        document.getElementById("lbl-item-desc").innerText = data.itemDesc;
+        document.getElementById("lbl-cant").innerText =
+          `${data.cant} Unidad(es) [${data.sku}]`;
+        document.getElementById("lbl-timestamp").innerText =
+          `${new Date().toLocaleDateString("es-AR")} ${data.time}`;
+
+        const qrContainer = document.getElementById("label-qrcode");
+        qrContainer.innerHTML = "";
+
+        const qrPayload = JSON.stringify({
+          id: data.trackingId,
+          sku: data.sku,
+          qty: data.cant,
+          courier: data.carrier,
+          hub: "Dark Store General Paz CBA",
+        });
+
+        qrCodeInstance = new QRCode(qrContainer, {
+          text: qrPayload,
+          width: 100,
+          height: 100,
+          colorDark: "#0f172a",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+
+        document.getElementById("label-modal").style.display = "flex";
+        devLog("PACKING", `Rótulo emitido para bulto ${data.trackingId}`, data);
+      }
+
+      function closeLabelModal() {
+        document.getElementById("label-modal").style.display = "none";
       }
 
       // ACCIÓN: LOGÍSTICA INVERSA
