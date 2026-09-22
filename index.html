@@ -311,13 +311,20 @@
         color: #cbd5e1;
       }
 
-      /* Contenedor Lector Cámara */
-      #reader-container {
+      /* Contenedor Lector Cámara Global */
+      #global-camera-card {
         display: none;
-        border-radius: 12px;
-        overflow: hidden;
-        margin-bottom: 14px;
+        background: var(--surface);
         border: 2px solid var(--accent);
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 16px;
+        text-align: center;
+      }
+      #reader {
+        width: 100%;
+        border-radius: 10px;
+        overflow: hidden;
       }
 
       /* Cards Inventario */
@@ -392,12 +399,12 @@
       /* Footer Discreto con Versiones */
       .version-footer {
         text-align: center;
-        padding: 10px;
+        padding: 12px;
         font-size: 0.7rem;
         color: #475569;
         font-family: "JetBrains Mono", monospace;
         border-top: 1px solid #131b2e;
-        margin-top: 20px;
+        margin-top: 24px;
       }
       .version-tag {
         background: #131b2e;
@@ -470,6 +477,40 @@
         </div>
       </div>
 
+      <!-- CÁMARA GLOBAL (ACCESIBLE DESDE CUALQUIER PESTAÑA) -->
+      <div id="global-camera-card">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+          "
+        >
+          <span
+            style="font-size: 0.8rem; font-weight: 700; color: var(--accent)"
+            id="camera-target-label"
+            >📷 Escaneando código...</span
+          >
+          <button
+            onclick="stopCamera()"
+            style="
+              background: #f43f5e;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              padding: 4px 8px;
+              font-size: 0.75rem;
+              cursor: pointer;
+              font-weight: 700;
+            "
+          >
+            ✕ Cerrar
+          </button>
+        </div>
+        <div id="reader"></div>
+      </div>
+
       <!-- PESTAÑA 1: PICK & PACK (DESPACHO) -->
       <section id="view-dispatch">
         <div class="card">
@@ -483,19 +524,15 @@
               margin-bottom: 14px;
             "
           >
-            Escaneá con la cámara o tipear el código directamente.
+            Escaneá con la cámara o tipeá el código directamente.
           </p>
 
           <button
             class="btn btn-camera"
-            id="btn-cam"
-            onclick="toggleCameraScanner('dispatch-code')"
+            onclick="startCameraFor('dispatch-code', 'Despacho de Pedidos')"
           >
             📷 Activar Escáner de Cámara
           </button>
-          <div id="reader-container">
-            <div id="reader" style="width: 100%"></div>
-          </div>
 
           <label class="field-label">Código EAN-13 o SKU</label>
           <input
@@ -575,13 +612,14 @@
               margin-bottom: 14px;
             "
           >
-            Recepción y triage de devoluciones vía Andreani o retiro.
+            Recepción y triage de devoluciones vía Andreani o retiro en
+            depósito.
           </p>
 
           <button
             class="btn btn-camera"
             style="color: var(--purple)"
-            onclick="toggleCameraScanner('reverse-code')"
+            onclick="startCameraFor('reverse-code', 'Prenda Retornada')"
           >
             📷 Escanear Prenda Retornada
           </button>
@@ -605,7 +643,7 @@
               <div class="condition-title" style="color: var(--success)">
                 ✓ APTO PARA VENTA
               </div>
-              <div class="condition-desc">Reingresa al stock disponible</div>
+              <div class="condition-desc">Reingresa al stock comercial</div>
             </div>
             <div
               class="condition-card"
@@ -615,7 +653,7 @@
               <div class="condition-title" style="color: var(--danger)">
                 ⚠ NO APTO (FALLADO)
               </div>
-              <div class="condition-desc">Pasa a Segunda / Cuarentena</div>
+              <div class="condition-desc">Pasa a Segunda / Merma</div>
             </div>
           </div>
 
@@ -642,13 +680,13 @@
 
           <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px">
             <div>
-              <label class="field-label">Resolución</label>
+              <label class="field-label">Detalle / Obs</label>
               <input
                 type="text"
                 id="reverse-obs"
                 class="input-control"
-                value="Recepción conforme"
-                placeholder="Detalle..."
+                value="Recepción en depósito"
+                placeholder="Detalle adicional..."
               />
             </div>
             <div>
@@ -799,7 +837,7 @@
       let isCameraActive = false;
       let clientIP = "Detectando...";
       let selectedCondition = "APTO";
-      let activeCameraTarget = "dispatch-code";
+      let currentCameraInputId = "dispatch-code";
 
       function devLog(module, msg, data = null) {
         const time = new Date().toLocaleTimeString("es-AR", { hour12: false });
@@ -879,7 +917,6 @@
         }
       }
 
-      // MANEJO DE CONDICIÓN EN LOGÍSTICA INVERSA
       function setCondition(cond) {
         selectedCondition = cond;
         const optApto = document.getElementById("opt-apto");
@@ -904,7 +941,7 @@
         btn.disabled = !clean || !item;
       }
 
-      // SESIÓN Y LOGIN
+      // GESTIÓN DE SESIÓN
       function verifySession() {
         document.getElementById("ver-client").innerText = HTML_VERSION;
         fetchClientIP();
@@ -960,21 +997,14 @@
         localStorage.removeItem("kindo_session_data");
         localStorage.removeItem("kindo_session_stamp");
         currentUser = null;
-        if (html5QrCode && isCameraActive) {
-          html5QrCode
-            .stop()
-            .then(() => {
-              isCameraActive = false;
-            })
-            .catch(() => {});
-        }
+        stopCamera();
         document.getElementById("user-display").innerText = "Turno Inactivo";
         document.getElementById("login-pin").value = "";
         document.getElementById("login-error").innerText = "";
         document.getElementById("login-modal").style.display = "flex";
       }
 
-      // CONECTOR JSONP
+      // CONECTOR JSONP CON PROPAGACIÓN DE VERSIÓN
       function callAPI(action, params, callback) {
         const cbName =
           "kindo_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
@@ -1009,7 +1039,6 @@
       }
 
       function fetchStock() {
-        // Render instantáneo desde caché
         const cached = localStorage.getItem("kindo_cached_catalog");
         if (cached && catalog.length === 0) {
           catalog = JSON.parse(cached);
@@ -1105,7 +1134,6 @@
         const item = findCatalogItem(cleanCode);
         if (!item) return;
 
-        // Si es APTO, incrementa el stock disponible localmente
         if (selectedCondition === "APTO") {
           item.stockActual += cant;
           if (item.stockActual > item.ptoPedido) item.estado = "OK";
@@ -1158,60 +1186,66 @@
         );
       }
 
-      // ESCÁNER DE CÁMARA MULTIPROPÓSITO
-      function toggleCameraScanner(targetInputId = "dispatch-code") {
-        activeCameraTarget = targetInputId;
-        const readerDiv = document.getElementById("reader-container");
-        const btn = document.getElementById("btn-cam");
+      // CÁMARA GLOBAL UNIFICADA
+      function startCameraFor(inputId, label) {
+        currentCameraInputId = inputId;
+        document.getElementById("camera-target-label").innerText =
+          `📷 Escaneando para: ${label}`;
+        const camCard = document.getElementById("global-camera-card");
+        camCard.style.display = "block";
 
-        if (isCameraActive) {
+        if (isCameraActive && html5QrCode) {
+          return;
+        }
+
+        const formatsToSupport = [
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+        ];
+        html5QrCode = new Html5Qrcode("reader", {
+          formatsToSupport: formatsToSupport,
+          verbose: false,
+        });
+
+        html5QrCode
+          .start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 120 } },
+            (decodedText) => {
+              const parsed = sanitizeToken(decodedText);
+              const targetEl = document.getElementById(currentCameraInputId);
+              if (targetEl) {
+                targetEl.value = parsed;
+                if (currentCameraInputId === "dispatch-code")
+                  checkDispatchBtn();
+                if (currentCameraInputId === "reverse-code") checkReverseBtn();
+              }
+              if (navigator.vibrate) navigator.vibrate(100);
+              stopCamera();
+            },
+            () => {},
+          )
+          .then(() => {
+            isCameraActive = true;
+          })
+          .catch(() => {
+            alert("No se pudo acceder a la cámara.");
+            stopCamera();
+          });
+      }
+
+      function stopCamera() {
+        if (html5QrCode && isCameraActive) {
           html5QrCode
             .stop()
             .then(() => {
-              readerDiv.style.display = "none";
-              if (btn) btn.innerText = "📷 Activar Escáner de Cámara";
               isCameraActive = false;
+              document.getElementById("global-camera-card").style.display =
+                "none";
             })
             .catch(() => {});
         } else {
-          readerDiv.style.display = "block";
-          if (btn) btn.innerText = "⏹ Apagar Cámara";
-
-          const formatsToSupport = [
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.EAN_13,
-          ];
-          html5QrCode = new Html5Qrcode("reader", {
-            formatsToSupport: formatsToSupport,
-            verbose: false,
-          });
-
-          html5QrCode
-            .start(
-              { facingMode: "environment" },
-              { fps: 10, qrbox: { width: 250, height: 120 } },
-              (decodedText) => {
-                const parsed = sanitizeToken(decodedText);
-                const inputEl = document.getElementById(activeCameraTarget);
-                if (inputEl) {
-                  inputEl.value = parsed;
-                  if (activeCameraTarget === "dispatch-code")
-                    checkDispatchBtn();
-                  if (activeCameraTarget === "reverse-code") checkReverseBtn();
-                }
-                if (navigator.vibrate) navigator.vibrate(100);
-                toggleCameraScanner(activeCameraTarget);
-              },
-              () => {},
-            )
-            .then(() => {
-              isCameraActive = true;
-            })
-            .catch(() => {
-              alert("No se pudo acceder a la cámara.");
-              readerDiv.style.display = "none";
-              isCameraActive = false;
-            });
+          document.getElementById("global-camera-card").style.display = "none";
         }
       }
 
@@ -1302,6 +1336,7 @@
       }
 
       function switchNav(view, btn) {
+        stopCamera();
         document.getElementById("view-dispatch").style.display =
           view === "dispatch" ? "block" : "none";
         document.getElementById("view-reverse").style.display =
