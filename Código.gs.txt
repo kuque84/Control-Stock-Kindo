@@ -1,10 +1,10 @@
 /**
  * KINDO DARK STORE HUB - BACKEND API OFICIAL
- * Versión: v3.3.1-gas
- * Soporte para Layout en U, Bin Location, Logística Inversa, Packing & Labelling y Auditoría.
+ * Versión: v3.4.0-gas
+ * Soporte para Layout en U, Bin Location, Logística Inversa, Packing, Labelling y Costeo Logístico Directo.
  */
 
-var APP_VERSION = "v3.3.1-gas";
+var APP_VERSION = "v3.4.0-gas";
 
 function doGet(e) {
   return handleRequest(e);
@@ -113,7 +113,6 @@ function handleRequest(e) {
         cb,
       );
 
-    // Leemos estrictamente de fila 5 a la última, columnas A a S (1 a 19)
     var numRows = lastRow - 4;
     var rows = sheet.getRange(5, 1, numRows, 19).getValues();
     var catalog = [];
@@ -160,13 +159,15 @@ function handleRequest(e) {
     );
   }
 
-  // 3. DESPACHO PICK & PACK (CON REGISTRO DE TRACKING DE BULTO)
+  // 3. DESPACHO PICK & PACK (CON COSTEO DIRECTO AUDITADO)
   if (action === "dispatch") {
     var tokenCode = cleanInput(p.code);
     var cant = parseInt(p.cant, 10) || 1;
     var canal = String(p.canal || "Uber Flash").trim();
     var author = String(p.author || "Operador").trim();
     var trackingId = String(p.trackingId || "").trim();
+    var costLog = String(p.costLog || "$0").trim();
+    var marginNet = String(p.marginNet || "$0").trim();
 
     if (tokenCode.indexOf("TOTAL") !== -1 || tokenCode === "") {
       return formatResponse(
@@ -225,6 +226,7 @@ function handleRequest(e) {
 
     var auditDetail = canal + " [" + targetUbicacion + "]";
     if (trackingId) auditDetail += " (Bulto: " + trackingId + ")";
+    if (costLog) auditDetail += " [CostoLog: " + costLog + " | MgNeto: " + marginNet + "]";
 
     logAudit(
       ss,
@@ -244,6 +246,8 @@ function handleRequest(e) {
         cant: cant,
         ubicacion: targetUbicacion,
         trackingId: trackingId,
+        costLog: costLog,
+        marginNet: marginNet,
         version: APP_VERSION,
       },
       cb,
