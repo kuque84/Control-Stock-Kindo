@@ -1,0 +1,518 @@
+/**
+ * KINDO DARK STORE HUB - BACKEND API OFICIAL
+ * Versión: v3.3.1-gas
+ * Soporte para Layout en U, Bin Location, Logística Inversa, Packing & Labelling y Auditoría.
+ */
+
+var APP_VERSION = "v3.3.1-gas";
+
+function doGet(e) {
+  return handleRequest(e);
+}
+function doPost(e) {
+  return handleRequest(e);
+}
+
+function handleRequest(e) {
+  var p = e && e.parameter ? e.parameter : {};
+  var action = p.action || "";
+  var cb = p.callback || "";
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. AUTENTICACIÓN FLEXIBLE (HASH O TEXTO PLANO)
+  if (action === "login") {
+    var rawPin = String(p.pin || "").trim();
+    var pinHash = computeSHA256(rawPin);
+    var uSheet = getOrCreateSheet(ss, "Usuarios", [
+      "ID",
+      "Nombre",
+      "PIN_HASH",
+      "Rol",
+      "Estado",
+    ]);
+
+    var users = uSheet.getDataRange().getValues();
+    var sessionUser = null;
+
+    for (var i = 1; i < users.length; i++) {
+      var cellPin = String(users[i][2] || "").trim();
+      var cellEstado = String(users[i][4] || "ACTIVO")
+        .toUpperCase()
+        .trim();
+
+      var pinValido = cellPin === pinHash || cellPin === rawPin;
+
+      if (pinValido && cellEstado === "ACTIVO") {
+        sessionUser = {
+          id: users[i][0],
+          nombre: String(users[i][1]).trim(),
+          rol: String(users[i][3] || "OPERADOR").trim(),
+        };
+        break;
+      }
+    }
+
+    if (!sessionUser) {
+      logAudit(
+        ss,
+        "LOGIN_FALLIDO",
+        "-",
+        0,
+        "Intento denegado (PIN incorrecto)",
+        "Desconocido",
+        p.ip,
+        p.ua,
+      );
+      return formatResponse(
+        {
+          status: "unauthorized",
+          message: "PIN incorrecto o usuario inactivo en planilla.",
+          version: APP_VERSION,
+          debug: {
+            pinRecibido: rawPin,
+            totalUsuariosEnSheet: Math.max(0, users.length - 1),
+          },
+        },
+        cb,
+      );
+    }
+
+    logAudit(
+      ss,
+      "LOGIN_OK",
+      "-",
+      0,
+      "Inicio de turno (8hs)",
+      sessionUser.nombre,
+      p.ip,
+      p.ua,
+    );
+    return formatResponse(
+      { status: "success", user: sessionUser, version: APP_VERSION },
+      cb,
+    );
+  }
+
+  // 2. CATÁLOGO CON BIN LOCATION Y LECTURA ULTRA RÁPIDA
+  if (action === "getStock") {
+    var sheet = ss.getSheetByName("Control_Stock");
+    if (!sheet)
+      return formatResponse(
+        {
+          status: "error",
+          message: "Hoja no encontrada",
+          version: APP_VERSION,
+        },
+        cb,
+      );
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 5)
+      return formatResponse(
+        { status: "success", data: [], version: APP_VERSION },
+        cb,
+      );
+
+    // Leemos estrictamente de fila 5 a la última, columnas A a S (1 a 19)
+    var numRows = lastRow - 4;
+    var rows = sheet.getRange(5, 1, numRows, 19).getValues();
+    var catalog = [];
+
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var rawSku = String(r[1] || "").trim();
+      var rawDesc = String(r[2] || "").trim();
+
+      if (
+        !rawSku ||
+        rawSku.toUpperCase().indexOf("TOTAL") !== -1 ||
+        rawDesc.toUpperCase().indexOf("TOTAL") !== -1
+      ) {
+        continue;
+      }
+
+      var rawEan = String(r[0] || r[17] || "");
+      var cleanEan = rawEan.replace(/[\*\s]/g, "");
+      var ubicacion = String(r[18] || "PAS-01-EST-A1").trim();
+
+      catalog.push({
+        row: i + 5,
+        ean: cleanEan,
+        sku: rawSku,
+        desc: rawDesc,
+        cat: String(r[3] || "").trim(),
+        abc: String(r[4] || "B").trim(),
+        costo: Number(r[5] || 0),
+        pvp: Number(r[6] || 0),
+        stockActual: Number(r[10] || 0),
+        valorInv: Number(r[11] || 0),
+        vtaProm: Number(r[12] || 0),
+        stockSeg: Number(r[13] || 0),
+        ptoPedido: Number(r[14] || 0),
+        pedSug: Number(r[15] || 0),
+        estado: String(r[16] || "OK").trim(),
+        ubicacion: ubicacion,
+      });
+    }
+    return formatResponse(
+      { status: "success", data: catalog, version: APP_VERSION },
+      cb,
+    );
+  }
+
+  // 3. DESPACHO PICK & PACK (CON REGISTRO DE TRACKING DE BULTO)
+  if (action === "dispatch") {
+    var tokenCode = cleanInput(p.code);
+    var cant = parseInt(p.cant, 10) || 1;
+    var canal = String(p.canal || "Uber Flash").trim();
+    var author = String(p.author || "Operador").trim();
+    var trackingId = String(p.trackingId || "").trim();
+
+    if (tokenCode.indexOf("TOTAL") !== -1 || tokenCode === "") {
+      return formatResponse(
+        {
+          status: "error",
+          message: "Operación rechazada.",
+          version: APP_VERSION,
+        },
+        cb,
+      );
+    }
+
+    var sSheet = ss.getSheetByName("Control_Stock");
+    var lastRow = sSheet.getLastRow();
+    if (lastRow < 5)
+      return formatResponse(
+        { status: "not_found", message: "Sin datos.", version: APP_VERSION },
+        cb,
+      );
+
+    var sData = sSheet.getRange(5, 1, lastRow - 4, 19).getValues();
+    var matchRow = -1;
+    var targetSku = "";
+    var targetUbicacion = "";
+    var currentEgresos = 0;
+
+    for (var j = 0; j < sData.length; j++) {
+      var rowSku = String(sData[j][1] || "").trim();
+      if (rowSku.toUpperCase().includes("TOTAL")) continue;
+
+      var rowEanClean = cleanInput(sData[j][0] || sData[j][17]);
+      var rowSkuClean = cleanInput(rowSku);
+
+      if (rowEanClean === tokenCode || rowSkuClean === tokenCode) {
+        matchRow = j + 5;
+        targetSku = rowSku;
+        targetUbicacion = String(sData[j][18] || "PAS-01-EST-A1").trim();
+        currentEgresos = Number(sData[j][9] || 0);
+        break;
+      }
+    }
+
+    if (matchRow === -1) {
+      return formatResponse(
+        {
+          status: "not_found",
+          message: "Artículo no localizado.",
+          version: APP_VERSION,
+        },
+        cb,
+      );
+    }
+
+    sSheet.getRange(matchRow, 10).setValue(currentEgresos + cant);
+    SpreadsheetApp.flush();
+
+    var auditDetail = canal + " [" + targetUbicacion + "]";
+    if (trackingId) auditDetail += " (Bulto: " + trackingId + ")";
+
+    logAudit(
+      ss,
+      "PICK_AND_PACK",
+      targetSku,
+      cant,
+      auditDetail,
+      author,
+      p.ip,
+      p.ua,
+    );
+
+    return formatResponse(
+      {
+        status: "success",
+        sku: targetSku,
+        cant: cant,
+        ubicacion: targetUbicacion,
+        trackingId: trackingId,
+        version: APP_VERSION,
+      },
+      cb,
+    );
+  }
+
+  // 4. INGRESO DE MERCADERÍA / RECEPCIÓN OPTIMIZADA
+  if (action === "receive") {
+    var rCode = cleanInput(p.code);
+    var rCant = parseInt(p.cant, 10) || 0;
+    var prov = String(p.prov || "Cba Textil").trim();
+    var rAuthor = String(p.author || "Operador").trim();
+
+    if (rCode.indexOf("TOTAL") !== -1 || rCode === "") {
+      return formatResponse(
+        { status: "error", message: "Código inválido.", version: APP_VERSION },
+        cb,
+      );
+    }
+
+    var rSheet = ss.getSheetByName("Control_Stock");
+    var lastRow = rSheet.getLastRow();
+    if (lastRow < 5)
+      return formatResponse(
+        { status: "not_found", message: "Sin datos.", version: APP_VERSION },
+        cb,
+      );
+
+    var rData = rSheet.getRange(5, 1, lastRow - 4, 19).getValues();
+    var rRow = -1;
+    var rSku = "";
+    var currentIngresos = 0;
+
+    for (var k = 0; k < rData.length; k++) {
+      var chkSku = String(rData[k][1] || "").trim();
+      if (chkSku.toUpperCase().includes("TOTAL")) continue;
+
+      if (
+        cleanInput(rData[k][0] || rData[k][17]) === rCode ||
+        cleanInput(chkSku) === rCode
+      ) {
+        rRow = k + 5;
+        rSku = chkSku;
+        currentIngresos = Number(rData[k][8] || 0);
+        break;
+      }
+    }
+
+    if (rRow === -1) {
+      return formatResponse(
+        {
+          status: "not_found",
+          message: "SKU/EAN inexistente.",
+          version: APP_VERSION,
+        },
+        cb,
+      );
+    }
+
+    rSheet.getRange(rRow, 9).setValue(currentIngresos + rCant);
+    SpreadsheetApp.flush();
+    logAudit(ss, "INGRESO_MERCADERIA", rSku, rCant, prov, rAuthor, p.ip, p.ua);
+
+    return formatResponse(
+      { status: "success", sku: rSku, cant: rCant, version: APP_VERSION },
+      cb,
+    );
+  }
+
+  // 5. LOGÍSTICA INVERSA (DEVOLUCIONES Y CAMBIOS CON TRIAGE)
+  if (action === "reverseLogistics") {
+    var revCode = cleanInput(p.code);
+    var revCant = parseInt(p.cant, 10) || 1;
+    var revCondicion = String(p.condicion || "APTO")
+      .toUpperCase()
+      .trim();
+    var revMotivo = String(p.motivo || "Cambio de talle").trim();
+    var revTransporte = String(p.transporte || "Andreani").trim();
+    var revAuthor = String(p.author || "Operador").trim();
+
+    if (revCode.indexOf("TOTAL") !== -1 || revCode === "") {
+      return formatResponse(
+        { status: "error", message: "Código inválido.", version: APP_VERSION },
+        cb,
+      );
+    }
+
+    var revSheet = ss.getSheetByName("Control_Stock");
+    var lastRow = revSheet.getLastRow();
+    if (lastRow < 5)
+      return formatResponse(
+        { status: "not_found", message: "Sin datos.", version: APP_VERSION },
+        cb,
+      );
+
+    var revData = revSheet.getRange(5, 1, lastRow - 4, 19).getValues();
+    var targetRow = -1;
+    var revSku = "";
+    var revDesc = "";
+    var currentIngresos = 0;
+
+    for (var m = 0; m < revData.length; m++) {
+      var cSku = String(revData[m][1] || "").trim();
+      if (cSku.toUpperCase().includes("TOTAL")) continue;
+
+      if (
+        cleanInput(revData[m][0] || revData[m][17]) === revCode ||
+        cleanInput(cSku) === revCode
+      ) {
+        targetRow = m + 5;
+        revSku = cSku;
+        revDesc = String(revData[m][2] || "").trim();
+        currentIngresos = Number(revData[m][8] || 0);
+        break;
+      }
+    }
+
+    if (targetRow === -1) {
+      return formatResponse(
+        {
+          status: "not_found",
+          message: "Prenda no localizada en catálogo.",
+          version: APP_VERSION,
+        },
+        cb,
+      );
+    }
+
+    if (revCondicion === "APTO") {
+      revSheet.getRange(targetRow, 9).setValue(currentIngresos + revCant);
+      SpreadsheetApp.flush();
+      logAudit(
+        ss,
+        "LOGISTICA_INVERSA_APTO",
+        revSku,
+        revCant,
+        revMotivo + " (" + revTransporte + ") -> Stock Disponible",
+        revAuthor,
+        p.ip,
+        p.ua,
+      );
+    } else {
+      var sheetFallados = getOrCreateSheet(ss, "Logistica_Inversa", [
+        "Fecha y Hora",
+        "SKU",
+        "Descripción",
+        "Cantidad",
+        "Motivo",
+        "Transporte",
+        "Estado",
+        "Operador",
+      ]);
+      sheetFallados.appendRow([
+        new Date().toLocaleString("es-AR", {
+          timeZone: "America/Argentina/Cordoba",
+        }),
+        revSku,
+        revDesc,
+        revCant,
+        revMotivo,
+        revTransporte,
+        "SEGUNDA / MERMA",
+        revAuthor,
+      ]);
+      logAudit(
+        ss,
+        "LOGISTICA_INVERSA_NO_APTO",
+        revSku,
+        revCant,
+        revMotivo + " (" + revTransporte + ") -> Segunda/Merma",
+        revAuthor,
+        p.ip,
+        p.ua,
+      );
+    }
+
+    return formatResponse(
+      {
+        status: "success",
+        sku: revSku,
+        cant: revCant,
+        condicion: revCondicion,
+        version: APP_VERSION,
+      },
+      cb,
+    );
+  }
+
+  return formatResponse(
+    { status: "error", message: "Acción no reconocida", version: APP_VERSION },
+    cb,
+  );
+}
+
+// UTILIDADES Y AUDITORÍA
+function cleanInput(str) {
+  return String(str || "")
+    .replace(/[\*\s\-]/g, "")
+    .toUpperCase()
+    .trim();
+}
+
+function computeSHA256(input) {
+  var rawHash = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    input,
+    Utilities.Charset.UTF_8,
+  );
+  var txt = "";
+  for (var i = 0; i < rawHash.length; i++) {
+    var b = rawHash[i];
+    if (b < 0) b += 256;
+    var byteStr = b.toString(16);
+    if (byteStr.length == 1) byteStr = "0" + byteStr;
+    txt += byteStr;
+  }
+  return txt;
+}
+
+function HASH_PIN(pin) {
+  if (!pin) return "";
+  return computeSHA256(String(pin).trim());
+}
+
+function getOrCreateSheet(ss, name, headers) {
+  var s = ss.getSheetByName(name);
+  if (!s) {
+    s = ss.insertSheet(name);
+    s.appendRow(headers);
+    s.getRange(1, 1, 1, headers.length)
+      .setFontWeight("bold")
+      .setBackground("#0f172a")
+      .setFontColor("#ffffff");
+  }
+  return s;
+}
+
+function logAudit(ss, tipo, sku, cant, detalle, autor, ip, ua) {
+  var logs = getOrCreateSheet(ss, "Logs_Movimientos", [
+    "Fecha y Hora",
+    "Tipo Evento",
+    "SKU",
+    "Cantidad",
+    "Canal / Info",
+    "Operador",
+    "IP",
+    "User Agent",
+  ]);
+  logs.appendRow([
+    new Date().toLocaleString("es-AR", {
+      timeZone: "America/Argentina/Cordoba",
+    }),
+    tipo,
+    sku,
+    cant,
+    detalle,
+    autor,
+    ip || "N/A",
+    ua || "N/A",
+  ]);
+}
+
+function formatResponse(obj, cb) {
+  if (cb && cb.trim() !== "") {
+    return ContentService.createTextOutput(
+      cb + "(" + JSON.stringify(obj) + ");",
+    ).setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
+    ContentService.MimeType.JSON,
+  );
+}

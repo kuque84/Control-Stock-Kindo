@@ -240,6 +240,41 @@
         opacity: 0.9;
       }
 
+      /* Tarjeta de Costos Logísticos Directos (Prioridad 5) */
+      #cost-breakdown-card {
+        display: none;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid var(--accent);
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+        font-size: 0.8rem;
+      }
+      .cost-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 4px;
+        color: #94a3b8;
+      }
+      .cost-row b {
+        color: #f8fafc;
+        font-family: "JetBrains Mono", monospace;
+      }
+      .cost-total-row {
+        display: flex;
+        justify-content: space-between;
+        border-top: 1px solid var(--surface-border);
+        padding-top: 6px;
+        margin-top: 6px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .margin-highlight {
+        color: var(--success);
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 800;
+      }
+
       /* Radio Cards para Condición de Logística Inversa */
       .condition-grid {
         display: grid;
@@ -683,14 +718,18 @@
           <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px">
             <div>
               <label class="field-label">Canal Logístico</label>
-              <select id="dispatch-canal" class="input-control">
+              <select
+                id="dispatch-canal"
+                class="input-control"
+                onchange="calculateLogisticsCost()"
+              >
                 <option value="Uber Flash (Cba Capital)">
-                  🛵 Uber Flash (CBA)
+                  🛵 Uber Flash (CBA) [+$3.800]
                 </option>
                 <option value="Andreani (Federal)">
-                  🚛 Andreani (Federal)
+                  🚛 Andreani (Federal) [+$6.200]
                 </option>
-                <option value="Retiro Dark Store">🏬 Retiro Local</option>
+                <option value="Retiro Dark Store">🏬 Retiro Local [$0]</option>
               </select>
             </div>
             <div>
@@ -701,7 +740,30 @@
                 class="input-control"
                 value="1"
                 min="1"
+                oninput="calculateLogisticsCost()"
               />
+            </div>
+          </div>
+
+          <!-- TARJETA DE COSTOS LOGÍSTICOS DIRECTOS (PRIORIDAD 5) -->
+          <div id="cost-breakdown-card">
+            <div class="cost-row">
+              <span>Packaging KINDO (Kraft + Seda + Cinta):</span>
+              <b id="c-pack">$1.200</b>
+            </div>
+            <div class="cost-row">
+              <span>Tarifa de Transporte / Flete:</span>
+              <b id="c-flete">$3.800</b>
+            </div>
+            <div class="cost-row">
+              <span>Costo Logístico Directo Total:</span>
+              <b id="c-total-log" style="color: var(--warning)">$5.000</b>
+            </div>
+            <div class="cost-total-row">
+              <span>Margen Contribución Neta:</span>
+              <span id="c-margin-net" class="margin-highlight"
+                >+$14.500 (45%)</span
+              >
             </div>
           </div>
 
@@ -989,7 +1051,7 @@
       <footer class="version-footer">
         <span
           >KINDO OPS // CLIENT:
-          <b class="version-tag" id="ver-client">v3.3.0-ui</b></span
+          <b class="version-tag" id="ver-client">v3.4.0-ui</b></span
         >
         &nbsp;|&nbsp;
         <span
@@ -1020,10 +1082,18 @@
 
     <script>
       // CONTROL DE VERSIONES Y CONFIGURACIÓN
-      const HTML_VERSION = "v3.3.1-ui";
+      const HTML_VERSION = "v3.4.0-ui";
       const GAS_URL =
         "https://script.google.com/macros/s/AKfycbxFWAZ00PqdswIasjKV0T_qT7yqUliFD-6EybpXVhslgxthhIiIzcJKU_TMLwYjMcek/exec";
       const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;
+
+      // PARÁMETROS DE COSTEO LOGÍSTICO DIRECTO (PRIORIDAD 5)
+      const PACKAGING_COST = 1200; // Caja Kraft + Papel de seda + Cinta KINDO
+      const CARRIER_RATES = {
+        "Uber Flash (Cba Capital)": 3800,
+        "Andreani (Federal)": 6200,
+        "Retiro Dark Store": 0,
+      };
 
       let currentUser = null;
       let catalog = [];
@@ -1086,6 +1156,50 @@
         });
       }
 
+      // CÁLCULO DE COSTOS LOGÍSTICOS DIRECTOS Y CONTRIBUCIÓN MARGINAL (PRIORIDAD 5)
+      function calculateLogisticsCost() {
+        const inputEl = document.getElementById("dispatch-code");
+        const clean = sanitizeToken(inputEl.value);
+        const canal = document.getElementById("dispatch-canal").value;
+        const cant =
+          parseInt(document.getElementById("dispatch-cant").value, 10) || 1;
+        const costCard = document.getElementById("cost-breakdown-card");
+
+        const item = findCatalogItem(clean);
+        if (!item) {
+          costCard.style.display = "none";
+          return { costLog: "$0", marginNet: "$0" };
+        }
+
+        const fleteCost = CARRIER_RATES[canal] || 0;
+        const totalLogCost = PACKAGING_COST + fleteCost;
+
+        // Facturación estimada (PVP x Unidades) y Costo de Fabricación (CMV)
+        const revenue = (item.pvp || 0) * cant;
+        const cmvTotal = (item.costo || 0) * cant;
+        const netMarginValue = revenue - cmvTotal - totalLogCost;
+        const netMarginPct =
+          revenue > 0 ? Math.round((netMarginValue / revenue) * 100) : 0;
+
+        document.getElementById("c-pack").innerText =
+          `$${PACKAGING_COST.toLocaleString("es-AR")}`;
+        document.getElementById("c-flete").innerText =
+          `$${fleteCost.toLocaleString("es-AR")}`;
+        document.getElementById("c-total-log").innerText =
+          `$${totalLogCost.toLocaleString("es-AR")}`;
+
+        const marginEl = document.getElementById("c-margin-net");
+        marginEl.innerText = `${netMarginValue >= 0 ? "+" : ""}$${netMarginValue.toLocaleString("es-AR")} (${netMarginPct}%)`;
+        marginEl.style.color =
+          netMarginValue >= 0 ? "var(--success)" : "var(--danger)";
+
+        costCard.style.display = "block";
+        return {
+          costLog: `$${totalLogCost.toLocaleString("es-AR")}`,
+          marginNet: `$${netMarginValue.toLocaleString("es-AR")} (${netMarginPct}%)`,
+        };
+      }
+
       function checkDispatchBtn() {
         const inputEl = document.getElementById("dispatch-code");
         const clean = sanitizeToken(inputEl.value);
@@ -1094,6 +1208,7 @@
 
         if (!clean) {
           binBox.style.display = "none";
+          document.getElementById("cost-breakdown-card").style.display = "none";
           btn.disabled = true;
           return;
         }
@@ -1106,8 +1221,10 @@
             `${item.desc} — Clase ${item.abc} (${item.cat})`;
           binBox.style.display = "block";
           btn.disabled = false;
+          calculateLogisticsCost();
         } else {
           binBox.style.display = "none";
+          document.getElementById("cost-breakdown-card").style.display = "none";
           btn.disabled = true;
         }
       }
@@ -1182,7 +1299,7 @@
             document.getElementById("login-modal").style.display = "none";
             err.innerText = "";
 
-            // Pausa de estabilización para evitar colisión de sockets en GAS
+            // Pausa de 600ms para evitar colisión de conexiones en Google Apps Script
             setTimeout(() => {
               fetchStock();
             }, 600);
@@ -1274,7 +1391,7 @@
         document.getElementById("kpi-alerts").innerText = alertsCount;
       }
 
-      // ACCIÓN: PICK & PACK + EMISIÓN DE RÓTULO DE BULTO (PRIORIDAD 4)
+      // ACCIÓN: PICK & PACK + COSTEO LOGÍSTICO + EMISIÓN DE RÓTULO
       function submitDispatch() {
         const inputEl = document.getElementById("dispatch-code");
         const cleanCode = sanitizeToken(inputEl.value);
@@ -1285,6 +1402,9 @@
         if (!cleanCode) return;
         const item = findCatalogItem(cleanCode);
         if (!item) return;
+
+        // Calcular costo logístico directo
+        const costData = calculateLogisticsCost();
 
         // Generar Tracking ID único para la caja de embalaje Kraft
         const trackingId = "KND-EXP-" + Date.now().toString().slice(-6);
@@ -1303,7 +1423,7 @@
           minute: "2-digit",
           second: "2-digit",
         });
-        logBox.innerHTML = `<span style="color: var(--success); font-weight:700;">✓ [${time}]</span> Despachadas ${cant}u de <b>${item.desc}</b> (${canal}) — 🏷 Bulto: <b>${trackingId}</b>`;
+        logBox.innerHTML = `<span style="color: var(--success); font-weight:700;">✓ [${time}]</span> Despachadas ${cant}u de <b>${item.desc}</b> (${canal}) — 🏷 Bulto: <b>${trackingId}</b><br><small style="color:#94a3b8;">Costo Log: ${costData.costLog} | Margen Neto: ${costData.marginNet}</small>`;
 
         inputEl.value = "";
         checkDispatchBtn();
@@ -1319,7 +1439,7 @@
           time: time,
         });
 
-        // Registro asíncrono sin bloquear la app
+        // Registro asíncrono en Google Sheets con costo directo
         callAPI(
           "dispatch",
           {
@@ -1327,6 +1447,8 @@
             cant: cant,
             canal: canal,
             trackingId: trackingId,
+            costLog: costData.costLog,
+            marginNet: costData.marginNet,
             author: currentUser.nombre,
           },
           (res) => {
