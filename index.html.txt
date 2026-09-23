@@ -275,6 +275,24 @@
         font-weight: 800;
       }
 
+      /* Alerta de Lead Time / SLA (Prioridad 6) */
+      .sla-pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 800;
+        font-family: "JetBrains Mono", monospace;
+      }
+      .sla-ok {
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--success);
+      }
+      .sla-warn {
+        background: rgba(245, 158, 11, 0.2);
+        color: var(--warning);
+      }
+
       /* Radio Cards para Condición de Logística Inversa */
       .condition-grid {
         display: grid;
@@ -450,7 +468,7 @@
         border: 1px solid #232f48;
       }
 
-      /* MODAL DE RÓTULO DE ENVÍO / PACKING (PRIORIDAD 4) */
+      /* MODAL DE RÓTULO DE ENVÍO / PACKING (PRIORIDADES 4 Y 6) */
       #label-modal {
         display: none;
         position: fixed;
@@ -466,7 +484,7 @@
         background: white;
         color: #0f172a;
         width: 100%;
-        max-width: 360px;
+        max-width: 380px;
         border-radius: 14px;
         padding: 20px;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
@@ -538,7 +556,7 @@
         font-weight: 600;
       }
 
-      /* ESTILOS DE IMPRESIÓN EXCLUSIVA DE ETIQUETA */
+      /* ESTILOS DE IMPRESIÓN */
       @media print {
         body * {
           visibility: hidden;
@@ -686,7 +704,7 @@
               margin-bottom: 14px;
             "
           >
-            Escaneá con la cámara o tipeá el código directamente.
+            Escaneá con la cámara o tipeá el código de la prenda.
           </p>
 
           <button
@@ -712,6 +730,29 @@
             <div id="bin-location-txt" class="bin-coord">PAS-01-EST-A1</div>
             <div id="bin-location-desc" class="bin-details">
               Remera Oversize M - Negro (Clase A)
+            </div>
+          </div>
+
+          <!-- DATOS DE LA ORDEN DE TIENDA NUBE Y LEAD TIME (PRIORIDAD 6) -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+            <div>
+              <label class="field-label">N° Orden Tienda Nube</label>
+              <input
+                type="text"
+                id="order-id"
+                class="input-control"
+                value="#TN-2048"
+                placeholder="#TN-1001"
+              />
+            </div>
+            <div>
+              <label class="field-label">Hora Ingreso Orden</label>
+              <input
+                type="time"
+                id="order-time"
+                class="input-control"
+                onchange="calculateLogisticsCost()"
+              />
             </div>
           </div>
 
@@ -745,7 +786,7 @@
             </div>
           </div>
 
-          <!-- TARJETA DE COSTOS LOGÍSTICOS DIRECTOS (PRIORIDAD 5) -->
+          <!-- TARJETA DE COSTOS LOGÍSTICOS DIRECTOS Y LEAD TIME -->
           <div id="cost-breakdown-card">
             <div class="cost-row">
               <span>Packaging KINDO (Kraft + Seda + Cinta):</span>
@@ -758,6 +799,12 @@
             <div class="cost-row">
               <span>Costo Logístico Directo Total:</span>
               <b id="c-total-log" style="color: var(--warning)">$5.000</b>
+            </div>
+            <div class="cost-row">
+              <span>Lead Time de Preparación:</span>
+              <b id="c-lead-time"
+                >25 min <span class="sla-pill sla-ok">SLA CUMPLIDO</span></b
+              >
             </div>
             <div class="cost-total-row">
               <span>Margen Contribución Neta:</span>
@@ -980,7 +1027,7 @@
         </div>
       </section>
 
-      <!-- MODAL DE RÓTULO DE BULTO / CAJA KRAFT (PRIORIDAD 4) -->
+      <!-- MODAL DE RÓTULO DE BULTO / CAJA KRAFT (PRIORIDADES 4 Y 6) -->
       <div id="label-modal">
         <div class="label-box">
           <div id="printable-shipping-label" class="shipping-tag-card">
@@ -998,6 +1045,11 @@
                   style="font-family: &quot;JetBrains Mono&quot;, monospace"
                 >
                   KND-EXP-000000
+                </div>
+
+                <div class="st-field-title">Orden Tienda Nube // Lead Time</div>
+                <div class="st-field-val" id="lbl-order-ref">
+                  #TN-2048 (25 min)
                 </div>
 
                 <div class="st-field-title">Contenido del Bulto</div>
@@ -1051,7 +1103,7 @@
       <footer class="version-footer">
         <span
           >KINDO OPS // CLIENT:
-          <b class="version-tag" id="ver-client">v3.4.0-ui</b></span
+          <b class="version-tag" id="ver-client">v3.5.0-ui</b></span
         >
         &nbsp;|&nbsp;
         <span
@@ -1082,7 +1134,7 @@
 
     <script>
       // CONTROL DE VERSIONES Y CONFIGURACIÓN
-      const HTML_VERSION = "v3.4.0-ui";
+      const HTML_VERSION = "v3.5.0-ui";
       const GAS_URL =
         "https://script.google.com/macros/s/AKfycbxFWAZ00PqdswIasjKV0T_qT7yqUliFD-6EybpXVhslgxthhIiIzcJKU_TMLwYjMcek/exec";
       const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;
@@ -1156,7 +1208,19 @@
         });
       }
 
-      // CÁLCULO DE COSTOS LOGÍSTICOS DIRECTOS Y CONTRIBUCIÓN MARGINAL (PRIORIDAD 5)
+      // INICIALIZADOR DE HORA DE ORDEN SIMULADA (25 MINUTOS ANTES)
+      function initSimulatedOrderTime() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - 25);
+        const hh = String(now.getHours()).padStart(2, "0");
+        const mm = String(now.getMinutes()).padStart(2, "0");
+        const orderTimeInput = document.getElementById("order-time");
+        if (orderTimeInput && !orderTimeInput.value) {
+          orderTimeInput.value = `${hh}:${mm}`;
+        }
+      }
+
+      // CÁLCULO DE COSTOS LOGÍSTICOS DIRECTOS Y LEAD TIME (PRIORIDADES 5 Y 6)
       function calculateLogisticsCost() {
         const inputEl = document.getElementById("dispatch-code");
         const clean = sanitizeToken(inputEl.value);
@@ -1168,7 +1232,12 @@
         const item = findCatalogItem(clean);
         if (!item) {
           costCard.style.display = "none";
-          return { costLog: "$0", marginNet: "$0" };
+          return {
+            costLog: "$0",
+            marginNet: "$0",
+            leadTime: "N/A",
+            slaStatus: "N/A",
+          };
         }
 
         const fleteCost = CARRIER_RATES[canal] || 0;
@@ -1181,12 +1250,34 @@
         const netMarginPct =
           revenue > 0 ? Math.round((netMarginValue / revenue) * 100) : 0;
 
+        // Medición de Lead Time
+        let leadTimeMinutes = 25;
+        const orderTimeVal = document.getElementById("order-time").value;
+        if (orderTimeVal) {
+          const parts = orderTimeVal.split(":");
+          const orderDate = new Date();
+          orderDate.setHours(
+            parseInt(parts[0], 10),
+            parseInt(parts[1], 10),
+            0,
+            0,
+          );
+          const diffMs = Math.max(0, Date.now() - orderDate.getTime());
+          leadTimeMinutes = Math.max(1, Math.round(diffMs / 60000));
+        }
+
+        const slaPillClass = leadTimeMinutes <= 45 ? "sla-ok" : "sla-warn";
+        const slaStatusText =
+          leadTimeMinutes <= 45 ? "SLA CUMPLIDO" : "RIESGO SLA";
+
         document.getElementById("c-pack").innerText =
           `$${PACKAGING_COST.toLocaleString("es-AR")}`;
         document.getElementById("c-flete").innerText =
           `$${fleteCost.toLocaleString("es-AR")}`;
         document.getElementById("c-total-log").innerText =
           `$${totalLogCost.toLocaleString("es-AR")}`;
+        document.getElementById("c-lead-time").innerHTML =
+          `${leadTimeMinutes} min <span class="sla-pill ${slaPillClass}">${slaStatusText}</span>`;
 
         const marginEl = document.getElementById("c-margin-net");
         marginEl.innerText = `${netMarginValue >= 0 ? "+" : ""}$${netMarginValue.toLocaleString("es-AR")} (${netMarginPct}%)`;
@@ -1197,6 +1288,8 @@
         return {
           costLog: `$${totalLogCost.toLocaleString("es-AR")}`,
           marginNet: `$${netMarginValue.toLocaleString("es-AR")} (${netMarginPct}%)`,
+          leadTime: `${leadTimeMinutes} min`,
+          slaStatus: slaStatusText,
         };
       }
 
@@ -1256,6 +1349,7 @@
       // GESTIÓN DE SESIÓN
       function verifySession() {
         document.getElementById("ver-client").innerText = HTML_VERSION;
+        initSimulatedOrderTime();
         fetchClientIP();
 
         const stored = localStorage.getItem("kindo_session_data");
@@ -1299,7 +1393,6 @@
             document.getElementById("login-modal").style.display = "none";
             err.innerText = "";
 
-            // Pausa de 600ms para evitar colisión de conexiones en Google Apps Script
             setTimeout(() => {
               fetchStock();
             }, 600);
@@ -1391,20 +1484,22 @@
         document.getElementById("kpi-alerts").innerText = alertsCount;
       }
 
-      // ACCIÓN: PICK & PACK + COSTEO LOGÍSTICO + EMISIÓN DE RÓTULO
+      // ACCIÓN: PICK & PACK + COSTEO LOGÍSTICO + LEAD TIME + EMISIÓN DE RÓTULO
       function submitDispatch() {
         const inputEl = document.getElementById("dispatch-code");
         const cleanCode = sanitizeToken(inputEl.value);
         const canal = document.getElementById("dispatch-canal").value;
         const cant =
           parseInt(document.getElementById("dispatch-cant").value, 10) || 1;
+        const orderId =
+          document.getElementById("order-id").value.trim() || "#TN-2048";
 
         if (!cleanCode) return;
         const item = findCatalogItem(cleanCode);
         if (!item) return;
 
-        // Calcular costo logístico directo
-        const costData = calculateLogisticsCost();
+        // Calcular costo logístico y Lead Time
+        const metricData = calculateLogisticsCost();
 
         // Generar Tracking ID único para la caja de embalaje Kraft
         const trackingId = "KND-EXP-" + Date.now().toString().slice(-6);
@@ -1423,7 +1518,7 @@
           minute: "2-digit",
           second: "2-digit",
         });
-        logBox.innerHTML = `<span style="color: var(--success); font-weight:700;">✓ [${time}]</span> Despachadas ${cant}u de <b>${item.desc}</b> (${canal}) — 🏷 Bulto: <b>${trackingId}</b><br><small style="color:#94a3b8;">Costo Log: ${costData.costLog} | Margen Neto: ${costData.marginNet}</small>`;
+        logBox.innerHTML = `<span style="color: var(--success); font-weight:700;">✓ [${time}]</span> Despachadas ${cant}u de <b>${item.desc}</b> (${canal}) — 🏷 Bulto: <b>${trackingId}</b><br><small style="color:#94a3b8;">Orden: ${orderId} | LeadTime: ${metricData.leadTime} (${metricData.slaStatus}) | MgNeto: ${metricData.marginNet}</small>`;
 
         inputEl.value = "";
         checkDispatchBtn();
@@ -1432,6 +1527,8 @@
         // Abrir modal de rotulado para la caja
         showShippingLabel({
           trackingId: trackingId,
+          orderId: orderId,
+          leadTime: metricData.leadTime,
           carrier: canal,
           itemDesc: item.desc,
           cant: cant,
@@ -1439,7 +1536,7 @@
           time: time,
         });
 
-        // Registro asíncrono en Google Sheets con costo directo
+        // Registro en Google Sheets con Lead Time
         callAPI(
           "dispatch",
           {
@@ -1447,8 +1544,11 @@
             cant: cant,
             canal: canal,
             trackingId: trackingId,
-            costLog: costData.costLog,
-            marginNet: costData.marginNet,
+            costLog: metricData.costLog,
+            marginNet: metricData.marginNet,
+            orderId: orderId,
+            leadTime: metricData.leadTime,
+            slaStatus: metricData.slaStatus,
             author: currentUser.nombre,
           },
           (res) => {
@@ -1463,12 +1563,14 @@
         );
       }
 
-      // RENDERIZADO DEL RÓTULO DE EMBALAJE (QR + DATOS DEL DESTINO)
+      // RENDERIZADO DEL RÓTULO DE EMBALAJE (QR + DATOS DE ORDEN Y SLA)
       function showShippingLabel(data) {
         document.getElementById("lbl-carrier").innerText = data.carrier
           .split(" ")[0]
           .toUpperCase();
         document.getElementById("lbl-tracking").innerText = data.trackingId;
+        document.getElementById("lbl-order-ref").innerText =
+          `${data.orderId} (${data.leadTime})`;
         document.getElementById("lbl-item-desc").innerText = data.itemDesc;
         document.getElementById("lbl-cant").innerText =
           `${data.cant} Unidad(es) [${data.sku}]`;
@@ -1480,6 +1582,8 @@
 
         const qrPayload = JSON.stringify({
           id: data.trackingId,
+          order: data.orderId,
+          leadTime: data.leadTime,
           sku: data.sku,
           qty: data.cant,
           courier: data.carrier,

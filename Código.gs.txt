@@ -1,10 +1,11 @@
 /**
  * KINDO DARK STORE HUB - BACKEND API OFICIAL
- * Versión: v3.4.0-gas
- * Soporte para Layout en U, Bin Location, Logística Inversa, Packing, Labelling y Costeo Logístico Directo.
+ * Versión: v3.5.0-gas
+ * Soporte para Layout en U, Bin Location, Logística Inversa, Packing, Labelling,
+ * Costeo Logístico Directo y Medición de Lead Time (OTIF / SLA Tienda Nube).
  */
 
-var APP_VERSION = "v3.4.0-gas";
+var APP_VERSION = "v3.5.0-gas";
 
 function doGet(e) {
   return handleRequest(e);
@@ -113,6 +114,7 @@ function handleRequest(e) {
         cb,
       );
 
+    // Leemos de fila 5 a la última, columnas A a S (1 a 19)
     var numRows = lastRow - 4;
     var rows = sheet.getRange(5, 1, numRows, 19).getValues();
     var catalog = [];
@@ -159,7 +161,7 @@ function handleRequest(e) {
     );
   }
 
-  // 3. DESPACHO PICK & PACK (CON COSTEO DIRECTO AUDITADO)
+  // 3. DESPACHO PICK & PACK (CON AUDITORÍA DE COSTOS Y LEAD TIME)
   if (action === "dispatch") {
     var tokenCode = cleanInput(p.code);
     var cant = parseInt(p.cant, 10) || 1;
@@ -168,6 +170,9 @@ function handleRequest(e) {
     var trackingId = String(p.trackingId || "").trim();
     var costLog = String(p.costLog || "$0").trim();
     var marginNet = String(p.marginNet || "$0").trim();
+    var orderId = String(p.orderId || "S/D").trim();
+    var leadTimeMin = String(p.leadTime || "N/A").trim();
+    var slaStatus = String(p.slaStatus || "OK").trim();
 
     if (tokenCode.indexOf("TOTAL") !== -1 || tokenCode === "") {
       return formatResponse(
@@ -224,9 +229,11 @@ function handleRequest(e) {
     sSheet.getRange(matchRow, 10).setValue(currentEgresos + cant);
     SpreadsheetApp.flush();
 
+    // Detalle enriquecido para trazabilidad operativa completa
     var auditDetail = canal + " [" + targetUbicacion + "]";
     if (trackingId) auditDetail += " (Bulto: " + trackingId + ")";
     if (costLog) auditDetail += " [CostoLog: " + costLog + " | MgNeto: " + marginNet + "]";
+    if (orderId) auditDetail += " [Orden: " + orderId + " | LeadTime: " + leadTimeMin + " (" + slaStatus + ")]";
 
     logAudit(
       ss,
@@ -248,6 +255,9 @@ function handleRequest(e) {
         trackingId: trackingId,
         costLog: costLog,
         marginNet: marginNet,
+        orderId: orderId,
+        leadTime: leadTimeMin,
+        slaStatus: slaStatus,
         version: APP_VERSION,
       },
       cb,
@@ -442,7 +452,7 @@ function handleRequest(e) {
   );
 }
 
-// UTILIDADES Y AUDITORÍA
+// FUNCIONES AUXILIARES Y AUDITORÍA
 function cleanInput(str) {
   return String(str || "")
     .replace(/[\*\s\-]/g, "")
