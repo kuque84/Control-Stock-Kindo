@@ -1,6 +1,7 @@
 /*! KINDO v4-patch.js - compatibilidad del front con el backend v4.0.0-gas
  *
- * Se carga DESPUÉS del script principal, con esta línea justo antes de </body>:
+ * Se carga DESPUÉS del script principal, con esta línea después del </script>
+ * principal y antes de </body>:
  *   <script src="v4-patch.js"></script>
  *
  * Qué hace:
@@ -9,14 +10,14 @@
  *  - Estado REORDENAR de la planilla tratado como REORDEN
  *  - Costos y margen solo para ADMIN
  *  - Lead time real (sin hora inventada) y SLA por canal
+ * La URL del backend es la de index.html (const GAS_URL).
  * Cuando esto se integre en index.html, este archivo se puede borrar.
  */
 (function () {
   "use strict";
 
-  // Deployment vigente de Apps Script (reemplaza a GAS_URL de index.html)
-  var GAS_URL_V4 =
-    "https://script.google.com/macros/s/AKfycbxR1uJamK6CiJewk9Y3ibPp2aMuFciABiNb-Nhi4onFIfE7bUtss9PVFedAgq-WTNnj/exec";
+  // Mismo deployment que define index.html
+  var GAS_URL_V4 = GAS_URL;
   var TOKEN_KEY = "kindo_session_token";
 
   // Meta de preparación en minutos por canal. CONFIRMAR los valores con el profesor.
@@ -100,7 +101,7 @@
     }
     script.src = qs;
     script.onerror = function () {
-      devLog("API", "Error de red en [" + action + "]");
+      devLog("API", "Error de red en [" + action + "] -> " + GAS_URL_V4);
       document.getElementById("kpi-sync").innerText = "🔴";
       done({ status: "network_error", message: "Sin conexión con el servidor." });
     };
